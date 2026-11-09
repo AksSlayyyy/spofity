@@ -18,6 +18,7 @@ void MMStatusBarHidden(BOOL hidden);
 // Bars. tint == nil -> black gloss (UIBarStyleBlack). Optional texture replaces the gradient (dark mode stripe).
 void MMRetroStyleNavBar(UINavigationBar *bar, UIColor *tint, UIImage *texture);
 void MMRetroStyleToolbar(UIToolbar *bar, BOOL dark);
+void MMRetroToolbarBackground(UIToolbar *bar, UIImage *image);   // e.g. mini player tinted by the cover
 void MMRetroStyleTabBar(UITabBar *bar, UIColor *accent);
 void MMRetroStyleSearchBar(UISearchBar *bar, BOOL dark);
 void MMRetroStyleSlider(UISlider *slider, UIColor *accent);

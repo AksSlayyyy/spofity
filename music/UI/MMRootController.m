@@ -729,12 +729,20 @@ static NSArray* shuffledFrom(NSArray*list,NSInteger idx){
     if(_npBar){
         [(UIToolbar*)_npBar setBarStyle:UIBarStyleBlack];
         [(UIToolbar*)_npBar setTintColor:nil];
+#ifdef MM_MODERN
+        MMRetroToolbarBackground((UIToolbar*)_npBar,[OJTheme gradientButtonImageWithColor:bar height:_npH]);
+#else
         [(UIToolbar*)_npBar setBackgroundImage:[OJTheme gradientButtonImageWithColor:bar height:_npH] forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsDefault];
+#endif
     }
     if(_dlBar){
         [(UIToolbar*)_dlBar setBarStyle:UIBarStyleBlack];
         [(UIToolbar*)_dlBar setTintColor:nil];
+#ifdef MM_MODERN
+        MMRetroToolbarBackground((UIToolbar*)_dlBar,[OJTheme gradientButtonImageWithColor:bar height:24]);
+#else
         [(UIToolbar*)_dlBar setBackgroundImage:[OJTheme gradientButtonImageWithColor:bar height:24] forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsDefault];
+#endif
     }
 }
 - (void)loadNpCover:(NSString *)url {

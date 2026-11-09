@@ -104,6 +104,43 @@ static UIColor *buttonBase(UIColor *tint) { return tint ? shade(tint,-0.06) : gr
 - (CGRect)mm_applicationFrame { CGRect b=self.bounds; return CGRectMake(0,MMRetroStatusH,b.size.width,b.size.height-MMRetroStatusH); }
 @end
 
+// iOS 14+: a UIToolbar puts its own content view over everything added with addSubview:, which hides and blocks
+// spofity's mini player (cover, title, play button). After each layout, move our own subviews back on top, keeping their order.
+@implementation UIToolbar (MMRetro)
+- (void)mm_layoutSubviews {
+    [self mm_layoutSubviews];
+    for (UIView *v in [self.subviews copy])
+        if (![NSStringFromClass([v class]) hasPrefix:@"_"]) [self bringSubviewToFront:v];
+}
+@end
+
+// iOS 6 table selection: blue (default) or gray gradient instead of the flat modern highlight.
+static UIView *selectionView(BOOL isGray) {
+    static UIImage *blue, *grayImg;
+    if (!blue) {
+        blue=drawImage(CGSizeMake(4,44), ^(CGContextRef ctx){ CGFloat l[]={0,1};
+            fillGradient(ctx,CGRectMake(0,0,4,44),@[[UIColor colorWithRed:0.02 green:0.55 blue:0.96 alpha:1],[UIColor colorWithRed:0.0 green:0.36 blue:0.88 alpha:1]],l); });
+        grayImg=drawImage(CGSizeMake(4,44), ^(CGContextRef ctx){ CGFloat l[]={0,1};
+            fillGradient(ctx,CGRectMake(0,0,4,44),@[gray(0.75),gray(0.58)],l); });
+    }
+    UIImageView *v=[[UIImageView alloc] initWithImage:isGray?grayImg:blue];
+    v.contentMode=UIViewContentModeScaleToFill; v.tag=0x6006;   // marks our own view (an app-set one is left alone)
+    return v;
+}
+@implementation UITableViewCell (MMRetro)
+- (instancetype)mm_initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)rid {
+    UITableViewCell *c=[self mm_initWithStyle:style reuseIdentifier:rid];
+    if (c) { c.selectedBackgroundView=selectionView(NO); c.textLabel.highlightedTextColor=[UIColor whiteColor]; c.detailTextLabel.highlightedTextColor=[UIColor whiteColor]; }
+    return c;
+}
+- (void)mm_setSelectionStyle:(UITableViewCellSelectionStyle)st {
+    [self mm_setSelectionStyle:st];
+    if (self.selectedBackgroundView && self.selectedBackgroundView.tag!=0x6006) return;
+    if (st==UITableViewCellSelectionStyleGray) self.selectedBackgroundView=selectionView(YES);
+    else if (st==UITableViewCellSelectionStyleBlue || st==UITableViewCellSelectionStyleDefault) self.selectedBackgroundView=selectionView(NO);
+}
+@end
+
 static void swapClass(Class c, SEL a, SEL b) {
     Method m1=class_getClassMethod(c,a), m2=class_getClassMethod(c,b);
     if (m1 && m2) method_exchangeImplementations(m1,m2);
@@ -223,6 +260,9 @@ void MMRetroInstall(void) {
     swapClass([UIFont class],@selector(italicSystemFontOfSize:),@selector(mm_italicSystemFontOfSize:));
     swapInstance([UIScreen class],@selector(applicationFrame),@selector(mm_applicationFrame));
     swapInstance([UIViewController class],@selector(presentViewController:animated:completion:),@selector(mm_presentViewController:animated:completion:));
+    swapInstance([UIToolbar class],@selector(layoutSubviews),@selector(mm_layoutSubviews));
+    swapInstance([UITableViewCell class],@selector(initWithStyle:reuseIdentifier:),@selector(mm_initWithStyle:reuseIdentifier:));
+    swapInstance([UITableViewCell class],@selector(setSelectionStyle:),@selector(mm_setSelectionStyle:));
 
     // Defaults for bars spofity doesn't style itself (e.g. the sheet's navigation controller).
     UINavigationBarAppearance *nav=[UINavigationBarAppearance new];
@@ -285,6 +325,16 @@ void MMRetroStyleToolbar(UIToolbar *bar, BOOL dark) {
     if (@available(iOS 15.0, *)) { bar.scrollEdgeAppearance=a; bar.compactScrollEdgeAppearance=a; }
     bar.tintColor=[UIColor whiteColor];
     bar.translucent=NO;
+}
+
+void MMRetroToolbarBackground(UIToolbar *bar, UIImage *image) {
+    if (!bar || !image) return;
+    UIToolbarAppearance *a=[UIToolbarAppearance new];
+    [a configureWithOpaqueBackground];
+    a.backgroundImage=image; a.backgroundImageContentMode=UIViewContentModeScaleToFill;
+    a.shadowColor=nil; a.shadowImage=nil;
+    bar.standardAppearance=a; bar.compactAppearance=a;
+    if (@available(iOS 15.0, *)) { bar.scrollEdgeAppearance=a; bar.compactScrollEdgeAppearance=a; }
 }
 
 void MMRetroStyleTabBar(UITabBar *bar, UIColor *accent) {
