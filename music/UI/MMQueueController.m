@@ -139,8 +139,11 @@ static UIImage* gripIcon(void){
     CGFloat right=MIN(c.contentView.bounds.size.width,c.bounds.size.width);   // Titel/Artist enden vor dem Ziehgriff (sonst laufen lange Titel darunter)
     for(UIView*v in c.subviews) if([NSStringFromClass([v class]) rangeOfString:@"Reorder"].location!=NSNotFound){
         right=MIN(right,v.frame.origin.x);
+#ifndef MM_MODERN   // modern iOS rebuilds its grip view later: replacing the image there made grips vanish; the native grip looks the same
         for(UIView*iv in v.subviews) if([iv isKindOfClass:[UIImageView class]]){ UIImageView*im=(UIImageView*)iv;
-            im.image=gripIcon(); im.contentMode=UIViewContentModeCenter; im.frame=v.bounds; } }
+            im.image=gripIcon(); im.contentMode=UIViewContentModeCenter; im.frame=v.bounds; }
+#endif
+    }
     if(tv.editing && [self tableView:tv canMoveRowAtIndexPath:ip]) right=MIN(right,c.bounds.size.width-44);   // Griff ist noch nicht angelegt
     for(NSInteger tag=2;tag<=3;tag++){ UIView*l=[c.contentView viewWithTag:tag]; if(l && right-66-8>40){ l.autoresizingMask=UIViewAutoresizingNone; CGRect f=l.frame; f.size.width=right-66-8; l.frame=f; } }
 }

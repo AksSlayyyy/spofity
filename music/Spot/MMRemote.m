@@ -249,11 +249,11 @@ static MMRemoteImpl *gImpl;
     else { m.triedAppAuthorize=NO; [m connectWithToken]; }   // in-app login if needed, then connect
 }
 
-+ (BOOL)isPlaying { MMRemoteImpl *m=gImpl; return m.remote.isConnected && m.stateURI && !m.statePaused && !m.ended; }
++ (BOOL)isPlaying { MMRemoteImpl *m=gImpl; return m.remote.isConnected && m.stateURI && m.stateStamp>0 && !m.statePaused && !m.ended; }
 + (BOOL)hasEnded { return gImpl.ended; }
 + (double)duration { return gImpl.stateDur; }
 + (double)currentTime {
-    MMRemoteImpl *m=gImpl; if (!m) return 0;
+    MMRemoteImpl *m=gImpl; if (!m || m.stateStamp<=0) return 0;   // no state from Spotify yet
     double t=m.statePos;
     if (!m.statePaused) t+=[NSDate timeIntervalSinceReferenceDate]-m.stateStamp;
     if (m.stateDur>0 && t>m.stateDur) t=m.stateDur;

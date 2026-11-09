@@ -258,6 +258,13 @@ void MMStatusBarHidden(BOOL hidden) {
 UIViewController *MMRetroBelowStatusBar(UIViewController *vc) {
     MMRetroStatusContainer *c=[MMRetroStatusContainer new]; c.inner=vc; return c;
 }
+void MMRetroPresent(UIViewController *presenter, UIViewController *vc) {
+    if ([UIDevice currentDevice].userInterfaceIdiom!=UIUserInterfaceIdiomPhone) { [presenter presentViewController:vc animated:YES completion:nil]; return; }
+    MMRetroStatusContainer *c=[MMRetroStatusContainer new]; c.inner=vc; c.clearBackground=YES;
+    c.modalPresentationStyle=UIModalPresentationOverFullScreen;
+    c.modalTransitionStyle=UIModalTransitionStyleCoverVertical;
+    [presenter presentViewController:c animated:YES completion:nil];
+}
 UIViewController *MMRetroUnwrap(UIViewController *vc) {
     return [vc isKindOfClass:[MMRetroStatusContainer class]] ? ((MMRetroStatusContainer *)vc).inner : vc;
 }

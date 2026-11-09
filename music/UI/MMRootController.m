@@ -892,7 +892,7 @@ static NSArray* shuffledFrom(NSArray*list,NSInteger idx){
 - (void)openQueue {
     if(MMIsPad() && !self.presentedViewController && UIInterfaceOrientationIsLandscape(self.interfaceOrientation)){ [self toggleQueueDock]; return; }
     if(self.presentedViewController) return;
-    [self presentViewController:[[MMQueueController alloc] init] animated:YES completion:nil];
+    MMRetroPresent(self,[[MMQueueController alloc] init]);
 }
 - (void)openPlayer {
     if([MMRetroUnwrap(self.presentedViewController) isKindOfClass:[MMPlayerController class]]) return;  // schon offen
@@ -901,6 +901,6 @@ static NSArray* shuffledFrom(NSArray*list,NSInteger idx){
     pc.trackTitle=_curTitle; pc.trackArtist=_curArtist; pc.coverURL=_curCover;
     pc.modalTransitionStyle=UIModalTransitionStyleCoverVertical;
     _player=pc;
-    [self presentViewController:pc animated:YES completion:nil];
+    MMRetroPresent(self,pc);
 }
 @end

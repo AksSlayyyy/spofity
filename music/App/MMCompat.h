@@ -94,5 +94,6 @@ enum {
 #define MMStatusBarHidden(h)  [[UIApplication sharedApplication] setStatusBarHidden:(h) withAnimation:UIStatusBarAnimationFade]
 #define MMRetroBelowStatusBar(vc) (vc)
 #define MMRetroUnwrap(vc) (vc)
+#define MMRetroPresent(p,vc) [(p) presentViewController:(vc) animated:YES completion:nil]
 #endif
 #endif // MM_MODERN

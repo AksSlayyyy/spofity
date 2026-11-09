@@ -274,7 +274,7 @@ MM_IOS6_END
 - (void)saveCurrent { NSDictionary*np=[MMRootController shared].nowPlaying; if(np) [MMSongMenu showSaveForTrack:np]; }
 - (void)openQueue {
     if(MMIsPad() && UIInterfaceOrientationIsLandscape(self.interfaceOrientation)){ [self toggleQueueDock]; return; }   // quer: von rechts herein
-    [self presentViewController:[[MMQueueController alloc] init] animated:YES completion:nil];
+    MMRetroPresent(self,[[MMQueueController alloc] init]);
 }
 // ---- iPad quer: Warteschlange schiebt sich von rechts herein, die Player-Spalte rückt in die linke Fläche ----
 - (void)toggleQueueDock {

@@ -34,6 +34,8 @@ void MMRetroRetintItems(UINavigationItem *item, UIColor *tint);
 // Wrap a root view controller so its view starts below the status bar (iOS 6 layout); Unwrap returns the inner one.
 UIViewController *MMRetroBelowStatusBar(UIViewController *vc);
 UIViewController *MMRetroUnwrap(UIViewController *vc);
+// Present full screen below the status bar like iOS 6 (iPhone; on iPad the controller's own style is kept).
+void MMRetroPresent(UIViewController *presenter, UIViewController *vc);
 UIImage *MMRetroPlusImage(void);
 
 UIImage *MMRetroGlossImage(UIColor *base, CGSize size, CGFloat radius, BOOL pressed);

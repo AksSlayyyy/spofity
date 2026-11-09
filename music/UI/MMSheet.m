@@ -23,6 +23,7 @@
     self.tableView.separatorColor = [OJTheme darkMode] ? [UIColor colorWithWhite:0.30 alpha:1.0] : [UIColor colorWithWhite:0.85 alpha:1.0];
 
     CGFloat W = self.view.bounds.size.width;
+    if (W < 200) W = [UIScreen mainScreen].bounds.size.width;   // view not laid out yet on modern iOS (width 0 -> labels slid off to the left)
     CGFloat h = self.imageURL.length ? 86 : (self.headSub.length ? 72 : 56);
     UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, W, h)];
     header.backgroundColor = [UIColor clearColor];
