@@ -20,3 +20,9 @@ Payload/
 USE-THIS-ICON.PNG
 /Icon.png
 TEMP-DELETE-AFTER-USE/
+
+# Modern iOS build
+build-modern/
+vendor/mbedtls/out/
+vendor/mbedtls/build/
+vendor/mbedtls/download/

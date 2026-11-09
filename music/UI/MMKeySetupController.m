@@ -95,6 +95,10 @@ MM_IOS6_END
     _cid.returnKeyType=UIReturnKeyNext; _sec.returnKeyType=UIReturnKeyGo;
 
     _save=[UIButton buttonWithType:UIButtonTypeRoundedRect];
+#ifdef MM_MODERN
+    MMRetroStyleRoundedRectButton(_save);
+#endif
+
     _save.frame=CGRectMake(40,_y,_W-80,44);
     _save.titleLabel.font=[UIFont boldSystemFontOfSize:15];
     [_save setTitle:L(@"CHECK & SAVE") forState:UIControlStateNormal];

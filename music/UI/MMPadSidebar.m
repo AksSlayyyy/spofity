@@ -53,7 +53,7 @@ static UIImage* sideIcon(NSString*name, UIColor*c, CGFloat s){
     hd.backgroundColor=[UIColor clearColor]; hd.text=[L(@"Recent Playlists") uppercaseString]; [self addSubview:hd];
     y+=22;
     CGFloat foot=2*ROW_H+12; _tableY=y; _showCF=YES;
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,y,W,H-y-foot) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,y,W,H-y-foot) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorStyle=UITableViewCellSeparatorStyleSingleLine; _table.rowHeight=PL_ROW_H;
     _table.dataSource=self; _table.delegate=self; _table.autoresizingMask=UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleWidth;

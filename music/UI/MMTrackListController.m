@@ -65,7 +65,7 @@ static char kRowKey;   // Zeilennummer am Artist-Label (Album-Seite)
     _offSpin=[[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhite];
     _offSpin.frame=CGRectMake(W-46,5,36,34); _offSpin.hidesWhenStopped=YES; [navBar addSubview:_offSpin];
 
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorStyle=UITableViewCellSeparatorStyleSingleLine;
     _table.dataSource=self; _table.delegate=self; _table.rowHeight=MMTrackRowH; _table.contentInset=UIEdgeInsetsMake(0,0,MMPageBottomInset(90),0);

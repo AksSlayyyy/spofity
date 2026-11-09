@@ -30,7 +30,7 @@
     [self.view addSubview:navBar];
 
     // flach wie in der Spotify-App: iOS-6-Gruppen zeichnen helle Kanten und Schatten um jede Karte
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:MMGroupedTableStyle];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorStyle=UITableViewCellSeparatorStyleSingleLine;
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[OJTheme backgroundColor];
@@ -152,6 +152,9 @@ static UIFont* footFont(void){ return [UIFont systemFontOfSize:13]; }
         b.frame=CGRectMake((W-240)/2,8,220,36);
         [b setTitle:r[@"title"] forState:UIControlStateNormal]; b.titleLabel.font=[UIFont boldSystemFontOfSize:15];
         if(primary) [b setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+#ifdef MM_MODERN
+        MMRetroStyleRoundedRectButton(b);
+#endif
         b.accessibilityIdentifier=r[@"key"]; [b addTarget:self action:@selector(tapButton:) forControlEvents:UIControlEventTouchUpInside];
         [c.contentView addSubview:b]; return c;
     }

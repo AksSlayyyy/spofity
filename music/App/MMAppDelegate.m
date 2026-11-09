@@ -24,8 +24,11 @@
         [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"OJThemeAccentDefaultApplied"];
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
+#ifdef MM_MODERN
+    MMRetroInstall();
+#endif
     [OJTheme apply];
-    [[UIApplication sharedApplication] setStatusBarStyle:([OJTheme darkMode]?UIStatusBarStyleBlackOpaque:UIStatusBarStyleDefault) animated:NO];
+    MMStatusBarDark([OJTheme darkMode]);
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.window.backgroundColor = [SpotTheme pageBackground];
     if ([MMSpotify hasStoredCreds]) {
@@ -39,7 +42,7 @@
             }];
     } else {
         // Noch nie gekoppelt: Code-Login (spotify.com/pair)
-        self.window.rootViewController = [[MMLoginController alloc] init];
+        self.window.rootViewController = MMRetroBelowStatusBar([[MMLoginController alloc] init]);
     }
     [self.window makeKeyAndVisible];
     // Persönliche Daten abgelaufen -> automatisch Code-Login (spotify.com/pair) zeigen
@@ -50,10 +53,10 @@
 - (void)authExpired {
     static NSTimeInterval last = 0;
     NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
-    if ([self.window.rootViewController isKindOfClass:[MMLoginController class]] || now - last < 30) return;   // nicht mehrfach
+    if ([MMRetroUnwrap(self.window.rootViewController) isKindOfClass:[MMLoginController class]] || now - last < 30) return;   // nicht mehrfach
     last = now;
     MMLoginController *lc = [[MMLoginController alloc] init];
     lc.forcePairing = YES;
-    self.window.rootViewController = lc;
+    self.window.rootViewController = MMRetroBelowStatusBar(lc);
 }
 @end

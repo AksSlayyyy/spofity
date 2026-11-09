@@ -115,15 +115,27 @@ MM_IOS6_END
     [tv addSubview:_navAlbumLbl]; [tv addSubview:_navTrackLbl];
     tv.userInteractionEnabled=YES; [tv addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openArtist)]];
     item.titleView=tv;
+#ifdef MM_MODERN
+    item.leftBarButtonItem=MMRetroBarItem(L(@"Back"),nil,NO,nil,self,@selector(close));
+    UIBarButtonItem *add=MMRetroBarItem(nil,MMRetroPlusImage(),NO,nil,self,@selector(saveCurrent));
+    UIBarButtonItem *queue=[[UIBarButtonItem alloc] initWithImage:[MMTintedIcon(@"lucide-list",[UIColor whiteColor]) imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal] style:UIBarButtonItemStylePlain target:self action:@selector(openQueue)];
+#else
     item.leftBarButtonItem=[[UIBarButtonItem alloc] initWithTitle:L(@"Back") style:UIBarButtonItemStyleBordered target:self action:@selector(close)];
     UIBarButtonItem *add=[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(saveCurrent)];
     UIBarButtonItem *queue=[[UIBarButtonItem alloc] initWithImage:MMTintedIcon(@"lucide-list",[UIColor whiteColor]) style:UIBarButtonItemStylePlain target:self action:@selector(openQueue)];
+#endif
     item.rightBarButtonItems=@[queue,add];
     _navBar.items=@[item];
+#ifdef MM_MODERN
+    MMRetroStyleNavBar(_navBar,nil,nil);
+#endif
     [_col addSubview:_navBar];
 
     _scrubBar=[[UIToolbar alloc] initWithFrame:CGRectMake(0,44,W,54)];
     _scrubBar.barStyle=UIBarStyleBlackTranslucent; _scrubBar.translucent=YES;
+#ifdef MM_MODERN
+    MMRetroStyleToolbar(_scrubBar,YES);
+#endif
     [_col addSubview:_scrubBar];
 
     CGFloat barH=50, volH=30, gap=8, bottomMargin=4;
@@ -153,6 +165,9 @@ MM_IOS6_END
     // Bottom control bar.
     _controls=[[UIToolbar alloc] initWithFrame:CGRectMake(0,ctrlY,W,barH)];
     _controls.barStyle=UIBarStyleBlack; _controls.translucent=NO;
+#ifdef MM_MODERN
+    MMRetroStyleToolbar(_controls,YES);
+#endif
     _prevItem=[[UIBarButtonItem alloc] initWithImage:ControlGlyph(@"prev",34) style:UIBarButtonItemStylePlain target:self action:@selector(prevTrack)];
     _nextItem=[[UIBarButtonItem alloc] initWithImage:ControlGlyph(@"next",34) style:UIBarButtonItemStylePlain target:self action:@selector(nextTrack)];
     [self buildControlItems];
@@ -312,11 +327,15 @@ MM_IOS6_END
 }
 - (void)applyVolumeAccent {
     UISlider *sl=[self volumeSliderIn:_volume];
+#ifdef MM_MODERN
+    MMRetroStyleVolumeView(_volume,[OJTheme accentColor]); (void)sl;
+#else
     if([sl respondsToSelector:@selector(setMinimumTrackTintColor:)]) sl.minimumTrackTintColor=[OJTheme accentColor];
+#endif
 }
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [[UIApplication sharedApplication] setStatusBarStyle:UIStatusBarStyleBlackOpaque animated:NO];
+    MMStatusBarDark(YES);
 }
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
@@ -327,7 +346,7 @@ MM_IOS6_END
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     [_timer invalidate]; _timer=nil;
-    [[UIApplication sharedApplication] setStatusBarStyle:([OJTheme darkMode]?UIStatusBarStyleBlackOpaque:UIStatusBarStyleDefault) animated:NO];
+    MMStatusBarDark([OJTheme darkMode]);
 }
 
 static NSString* fmtTime(double s){ if(s<0)s=0; int m=(int)s/60, sec=(int)s%60; return [NSString stringWithFormat:@"%d:%02d",m,sec]; }

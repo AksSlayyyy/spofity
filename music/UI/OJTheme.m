@@ -59,6 +59,10 @@ static UIImage *OJStripeImage(CGFloat height) {
 
 + (void)applyToNavigationBar:(UINavigationBar *)navBar {
     if (!navBar) return;
+#ifdef MM_MODERN
+    MMRetroStyleNavBar(navBar, [self darkMode]?nil:[self accentColor], [self darkMode]?OJStripeImage(44.0):nil);
+    return;
+#endif
     // Use the native bar: blue in light mode, black gloss in dark mode. No stripe texture and no tintColor
     // (on iOS 5 tintColor recolors the whole bar, which is not what we want).
     if ([self darkMode]) {
@@ -74,16 +78,22 @@ static UIImage *OJStripeImage(CGFloat height) {
         [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
         [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsLandscapePhone];
     }
+#ifndef MM_MODERN
     navBar.titleTextAttributes = @{
         UITextAttributeTextColor        : [UIColor whiteColor],
         UITextAttributeTextShadowColor  : [UIColor colorWithWhite:0.0 alpha:0.5],
         UITextAttributeTextShadowOffset : [NSValue valueWithCGSize:CGSizeMake(0, -1)]
     };
+#endif
     [navBar setNeedsDisplay];
 }
 
 + (void)applyToToolbar:(UIToolbar *)toolbar {
     if (!toolbar) return;
+#ifdef MM_MODERN
+    MMRetroStyleToolbar(toolbar, [self darkMode]);
+    return;
+#endif
     toolbar.barStyle = [self darkMode] ? UIBarStyleBlack : UIBarStyleDefault;
     toolbar.tintColor = [self accentColor];
 }
@@ -96,6 +106,9 @@ static UIImage *OJStripeImage(CGFloat height) {
 }
 
 + (void)applyToGroupedTableView:(UITableView *)tableView {
+#ifdef MM_MODERN
+    MMRetroStyleGroupedTable(tableView);
+#endif
     tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
     tableView.separatorColor = [self darkMode] ? [UIColor colorWithWhite:0.30 alpha:1.0] : [UIColor colorWithWhite:0.85 alpha:1.0];
     tableView.backgroundColor = [self darkMode] ? [UIColor colorWithWhite:0.15 alpha:1.0] : [UIColor groupTableViewBackgroundColor];
@@ -199,6 +212,9 @@ static UIImage *OJStripeImage(CGFloat height) {
     if ([view isKindOfClass:[UISwitch class]] && [view respondsToSelector:@selector(setOnTintColor:)]) {
         [(UISwitch *)view setOnTintColor:accent];
     }
+#ifdef MM_MODERN
+    if ([view isKindOfClass:[UISlider class]]) { MMRetroStyleSlider((UISlider *)view, accent); return; }
+#endif
     if ([view isKindOfClass:[UISlider class]] && [view respondsToSelector:@selector(setMinimumTrackTintColor:)]) {
         [(UISlider *)view setMinimumTrackTintColor:accent];
     }

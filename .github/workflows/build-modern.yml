@@ -1,0 +1,51 @@
+name: Build Spofity (modern iOS)
+
+on:
+  push:
+    branches: [ main, modern ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build against the iOS 26 SDK: apps built with it keep honoring UIDesignRequiresCompatibility
+      # (no Liquid Glass) and don't need the UIScene lifecycle, also when they run on iOS 27.
+      - name: Select Xcode 26
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$X" ]; then echo "::warning::No Xcode 26 found, using default"; else sudo xcode-select -s "$X"; fi
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Cache mbedTLS
+        id: mbed
+        uses: actions/cache@v4
+        with:
+          path: vendor/mbedtls/out/modern
+          key: mbedtls-3.6.7-modern-${{ hashFiles('vendor/mbedtls/*.h', 'vendor/mbedtls/*.c', 'vendor/mbedtls/build-modern.sh') }}
+
+      - name: Build mbedTLS (arm64)
+        if: steps.mbed.outputs.cache-hit != 'true'
+        run: |
+          vendor/mbedtls/fetch.sh
+          vendor/mbedtls/build-modern.sh
+
+      - name: Build app
+        run: make -f Makefile.modern -j4 ipa 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spofity-modern-ipa
+          path: Spofity-modern.ipa

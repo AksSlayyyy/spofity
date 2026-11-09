@@ -68,6 +68,10 @@ MM_IOS6_END
     for(UIView*x in @[_pairHint,_pairURL,and,_pairCode]) [_pairBox addSubview:x];
 
     _pairBtn=[UIButton buttonWithType:UIButtonTypeRoundedRect];
+#ifdef MM_MODERN
+    MMRetroStyleRoundedRectButton(_pairBtn);
+#endif
+
     _pairBtn.frame=CGRectMake(40,fy+118,W-80,44);
     _pairBtn.titleLabel.font=[UIFont boldSystemFontOfSize:16];
     [_pairBtn setTitle:L(@"LOG IN WITH PHONE") forState:UIControlStateNormal];
@@ -153,7 +157,7 @@ MM_IOS6_END
             [u setBool:YES forKey:@"keySetupShown"]; [u synchronize];
             MMKeySetupController*k=[[MMKeySetupController alloc] init]; k.skippable=YES;
             k.onDone=^(BOOL saved){ w.rootViewController=[[MMRootController alloc] init]; };
-            w.rootViewController=k; return;
+            w.rootViewController=MMRetroBelowStatusBar(k); return;
         }
         w.rootViewController=[[MMRootController alloc] init];
     });

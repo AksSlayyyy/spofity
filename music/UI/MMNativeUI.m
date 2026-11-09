@@ -11,6 +11,13 @@
     [OJTheme applyToNavigationBar:bar];
     return bar;
 }
+#ifdef MM_MODERN
+static UIColor *barTint(void) { return [OJTheme darkMode]?nil:[OJTheme accentColor]; }
++ (UIBarButtonItem *)backItemTarget:(id)target action:(SEL)action { return MMRetroBarItem(L(@"Back"),nil,NO,barTint(),target,action); }
++ (UIBarButtonItem *)doneItemTarget:(id)target action:(SEL)action { return MMRetroBarItem(L(@"Done"),nil,YES,barTint(),target,action); }
++ (UIBarButtonItem *)itemWithTitle:(NSString *)title target:(id)target action:(SEL)action { return MMRetroBarItem(title,nil,NO,barTint(),target,action); }
++ (UIBarButtonItem *)itemWithImage:(UIImage *)image target:(id)target action:(SEL)action { return MMRetroBarItem(nil,image,NO,barTint(),target,action); }
+#else
 + (UIBarButtonItem *)backItemTarget:(id)target action:(SEL)action {
     return [[UIBarButtonItem alloc] initWithTitle:L(@"Back") style:UIBarButtonItemStyleBordered target:target action:action];
 }
@@ -23,4 +30,5 @@
 + (UIBarButtonItem *)itemWithImage:(UIImage *)image target:(id)target action:(SEL)action {
     return [[UIBarButtonItem alloc] initWithImage:image style:UIBarButtonItemStyleBordered target:target action:action];
 }
+#endif
 @end

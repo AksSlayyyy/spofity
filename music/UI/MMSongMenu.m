@@ -27,7 +27,7 @@
     UINavigationBar *navBar=[MMNativeUI navigationBarWithTitle:L(@"Add to playlist") width:W];
     navBar.topItem.leftBarButtonItem=[MMNativeUI itemWithTitle:L(@"Cancel") target:self action:@selector(close)];
     [self.view addSubview:navBar];
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorColor=[SpotTheme line]; _table.rowHeight=60; _table.contentInset=UIEdgeInsetsMake(0,0,90,0);
     _table.dataSource=self; _table.delegate=self; _table.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight; [self.view addSubview:_table];

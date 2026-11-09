@@ -31,7 +31,7 @@
     navBar.topItem.leftBarButtonItem=[MMNativeUI backItemTarget:self action:@selector(close)];
     [self.view addSubview:navBar];
 
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorColor=[SpotTheme line]; _table.rowHeight=60;
     _table.dataSource=self; _table.delegate=self; _table.contentInset=_table.scrollIndicatorInsets=UIEdgeInsetsMake(0,0,MMPageBottomInset(90),0);

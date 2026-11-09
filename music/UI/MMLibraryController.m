@@ -42,7 +42,7 @@
     navBar.topItem.leftBarButtonItem=[MMNativeUI itemWithTitle:L(@"Downloads") target:self action:@selector(openDownloads)];
     navBar.topItem.rightBarButtonItem=[MMNativeUI itemWithTitle:L(@"Settings") target:self action:@selector(openSettings)];
 
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorColor=[SpotTheme line];
     _table.dataSource=self; _table.delegate=self; _table.rowHeight=60; _table.contentInset=UIEdgeInsetsMake(0,0,MMPageBottomInset(84),0);   // Platz für untere Leisten

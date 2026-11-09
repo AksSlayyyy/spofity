@@ -37,7 +37,7 @@
     navBar.topItem.leftBarButtonItem=[MMNativeUI backItemTarget:self action:@selector(close)];
     [self.view addSubview:navBar];
 
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorStyle=UITableViewCellSeparatorStyleSingleLine;
     _table.dataSource=self; _table.delegate=self; _table.rowHeight=MMTrackRowH; _table.contentInset=UIEdgeInsetsMake(0,0,MMPageBottomInset(90),0);
@@ -55,7 +55,7 @@
         head.frame=CGRectMake(0,44,W,172); head.autoresizingMask=UIViewAutoresizingFlexibleWidth; [self.view addSubview:head];
         CGFloat ty=44+172, lw=floor(W/2);
         _table.frame=CGRectMake(0,ty,lw,H-ty); _table.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleRightMargin|UIViewAutoresizingFlexibleHeight;
-        _table2=[[UITableView alloc] initWithFrame:CGRectMake(lw,ty,W-lw,H-ty) style:UITableViewStyleGrouped];
+        _table2=[[UITableView alloc] initWithFrame:CGRectMake(lw,ty,W-lw,H-ty) style:MMGroupedTableStyle];
         [OJTheme applyToGroupedTableView:_table2];
         _table2.backgroundColor=[UIColor clearColor]; _table2.separatorStyle=UITableViewCellSeparatorStyleSingleLine; _table2.dataSource=self; _table2.delegate=self;
         _table2.rowHeight=MMTrackRowH; _table2.contentInset=_table.contentInset;

@@ -1,0 +1,83 @@
+# Spofity for modern iOS (arm64, iOS 15+), built on macOS with the Xcode command line tools.
+# Same sources as the iOS 5/6 build; MMCompat.h switches to the modern path when the SDK is iOS 15+.
+#   vendor/mbedtls/fetch.sh && vendor/mbedtls/build-modern.sh
+#   make -f Makefile.modern ipa
+# The .ipa is unsigned (ad-hoc); Sideloadly / AltStore re-sign it with your Apple ID.
+SDK       := $(shell xcrun --sdk iphoneos --show-sdk-path)
+CC        := $(shell xcrun --sdk iphoneos -f clang)
+MINOS     := 15.0
+ARCH      := -arch arm64 -isysroot $(SDK) -miphoneos-version-min=$(MINOS)
+MBED      := vendor/mbedtls/out/modern
+
+APP       := build-modern/Spofity
+BIN       := Spofity
+BUNDLE    := Payload/$(BIN).app
+IPA       := Spofity-modern.ipa
+
+SRC_M     := $(wildcard music/App/*.m) $(wildcard music/UI/*.m) $(wildcard music/Spot/*.m)
+SRC_C     := $(wildcard music/Spot/*.c)
+OBJ       := $(patsubst %.m,build-modern/obj/%.o,$(SRC_M)) $(patsubst %.c,build-modern/obj/%.o,$(SRC_C))
+
+CFLAGS    := $(ARCH) -fobjc-arc -fmodules -O2 -Wall \
+             -Wno-deprecated-declarations -Wno-deprecated-implementations -Wno-format \
+             -Wno-unused-variable -Wno-unused-function -Wno-unguarded-availability-new \
+             -Wno-objc-method-access -Wno-incompatible-pointer-types \
+             -Wno-shorten-64-to-32 -Wno-unused-but-set-variable -Wno-incomplete-implementation \
+             -Imusic/App -Imusic/UI -Imusic/Spot -Ivendor/stb -I$(MBED)/include \
+             -include $(MBED)/include/mbedtls_ios6_predef.h \
+             -include music/App/MMCompat.h -DMM_MODERN=1 \
+             -MMD -MP
+CFLAGS_C  := $(ARCH) -O2 -Wall -Imusic/Spot -MMD -MP
+
+ifeq ($(DEBUG),1)
+CFLAGS    += -DDEBUG
+endif
+FRAMEWORKS:= -framework UIKit -framework CoreGraphics -framework Foundation -framework QuartzCore \
+             -framework AVFoundation -framework AudioToolbox -framework Security -framework MediaPlayer \
+             -framework SystemConfiguration
+LDFLAGS   := $(ARCH) -fobjc-arc -L$(MBED)/lib -lmbedtls -lmbedx509 -lmbedcrypto -ObjC
+
+ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(wildcard $(MBED)/lib/libmbedtls.a),)
+$(error build mbedTLS first: vendor/mbedtls/build-modern.sh)
+endif
+endif
+
+all: $(APP)
+
+$(APP): $(OBJ)
+	@mkdir -p $(dir $@)
+	$(CC) -o $@ $^ $(LDFLAGS) $(FRAMEWORKS)
+
+build-modern/obj/%.o: %.m
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build-modern/obj/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_C) -c $< -o $@
+
+bundle: $(APP)
+	@rm -rf $(BUNDLE)
+	@mkdir -p $(BUNDLE)
+	cp $(APP) $(BUNDLE)/$(BIN)
+	cp -R Resources/. $(BUNDLE)/
+	cp ResourcesModern/Info.plist $(BUNDLE)/Info.plist
+	cp ResourcesModern/*.png $(BUNDLE)/
+	rm -f $(BUNDLE)/Default*.png
+	plutil -convert binary1 $(BUNDLE)/Info.plist
+	printf "APPL????" > $(BUNDLE)/PkgInfo
+	chmod 0755 $(BUNDLE)/$(BIN)
+	codesign --force --sign - --timestamp=none $(BUNDLE)
+
+ipa: bundle
+	@rm -f $(IPA)
+	@zip -qry $(IPA) Payload
+	@echo "Built: $(CURDIR)/$(IPA)"
+
+clean:
+	@rm -rf build-modern Payload $(IPA)
+
+.PHONY: all bundle ipa clean
+
+-include $(OBJ:.o=.d)

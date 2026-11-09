@@ -46,8 +46,12 @@
     }
     self.tableView.tableHeaderView = header;
 
+#ifdef MM_MODERN
+    self.navigationItem.leftBarButtonItem = MMRetroBarItem(L(@"Cancel"), nil, NO, [OJTheme darkMode]?nil:[OJTheme accentColor], self, @selector(cancel));
+#else
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
                                                                                          target:self action:@selector(cancel)];
+#endif
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -96,7 +100,7 @@
     if (!presenter) presenter = [MMRootController shared];
     while (presenter.presentedViewController) presenter = presenter.presentedViewController;
 
-    MMActionListController *list = [[MMActionListController alloc] initWithStyle:UITableViewStyleGrouped];
+    MMActionListController *list = [[MMActionListController alloc] initWithStyle:MMGroupedTableStyle];
     list.options = options;
     list.headTitle = title;
     list.headSub = sub;

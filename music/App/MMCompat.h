@@ -1,3 +1,20 @@
+#ifdef MM_MODERN
+// ---- Modern iOS (arm64, iOS 15+ SDK) ----
+// Nothing from the iOS 5 shims below is needed: subscripting, NSTextAlignment etc. are native.
+#ifdef __OBJC__
+#import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
+#define MM_IOS6_BEGIN _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wunguarded-availability\"")
+#define MM_IOS6_END   _Pragma("clang diagnostic pop")
+// iOS 6 grouped tables were inset with rounded sections; on modern iOS that is the inset-grouped style.
+#define MMGroupedTableStyle UITableViewStyleInsetGrouped
+// UIAlertView / UIActionSheet: replaced by drawn iOS 6 look-alikes with the same API (MMRetro.m).
+#define UIAlertView   MMAlertView
+#define UIActionSheet MMActionSheet
+#define UISwitch      MMRetroSwitch
+#import "MMRetro.h"
+#endif
+#else
 // iOS-5-Kompatibilität. Wird per -include (Makefile) vor jede Datei gesetzt; Deployment-Target ist 5.0, ein Binary für iOS 5 und 6.
 // -Werror=unguarded-availability bleibt an: alles, was hier nicht steht, muss weiterhin echt geprüft werden.
 #ifdef __OBJC__
@@ -70,3 +87,12 @@ enum {
 #define MM_IOS6_BEGIN _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wunguarded-availability\"")
 #define MM_IOS6_END   _Pragma("clang diagnostic pop")
 #endif
+
+#ifdef __OBJC__
+#define MMGroupedTableStyle UITableViewStyleGrouped
+#define MMStatusBarDark(dark) [[UIApplication sharedApplication] setStatusBarStyle:((dark)?UIStatusBarStyleBlackOpaque:UIStatusBarStyleDefault) animated:NO]
+#define MMStatusBarHidden(h)  [[UIApplication sharedApplication] setStatusBarHidden:(h) withAnimation:UIStatusBarAnimationFade]
+#define MMRetroBelowStatusBar(vc) (vc)
+#define MMRetroUnwrap(vc) (vc)
+#endif
+#endif // MM_MODERN

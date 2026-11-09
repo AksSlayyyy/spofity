@@ -24,6 +24,10 @@
 
     // Verbindungstest: prüft Netz, Spotify-Server/Ports, Song-Schlüssel und Download, jeweils mit Zeitlimit
     _testBtn=[UIButton buttonWithType:UIButtonTypeRoundedRect];
+#ifdef MM_MODERN
+    MMRetroStyleRoundedRectButton(_testBtn);
+#endif
+
     _testBtn.frame=CGRectMake(16,50,W-32,36);
     _testBtn.titleLabel.font=[UIFont boldSystemFontOfSize:14];
     [_testBtn setTitle:L(@"Run connection test") forState:UIControlStateNormal];

@@ -46,7 +46,7 @@
     [self.view addSubview:_searchBar];
     [self styleSearchBar];
 
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,94,W,H-94) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,94,W,H-94) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorStyle=UITableViewCellSeparatorStyleSingleLine;
     _table.dataSource=self; _table.delegate=self; _table.rowHeight=MMTrackRowH; _table.contentInset=_table.scrollIndicatorInsets=UIEdgeInsetsMake(0,0,MMPageBottomInset(84),0);
@@ -55,6 +55,10 @@
     _hint=[[UILabel alloc] initWithFrame:CGRectMake(20,140,W-40,40)]; _hint.text=L(@"Find millions of songs."); _hint.textColor=[SpotTheme faint]; _hint.font=[SpotTheme sub]; _hint.textAlignment=NSTextAlignmentCenter; _hint.numberOfLines=0; [self.view addSubview:_hint];
 
     _unlock=[UIButton buttonWithType:UIButtonTypeRoundedRect];
+#ifdef MM_MODERN
+    MMRetroStyleRoundedRectButton(_unlock);
+#endif
+
     _unlock.frame=CGRectMake(50,196,W-100,44);
     _unlock.titleLabel.font=[UIFont boldSystemFontOfSize:14];
     [_unlock setTitle:L(@"UNLOCK SEARCH") forState:UIControlStateNormal];
@@ -109,6 +113,10 @@
     [[OJTheme backgroundColor] setFill]; UIRectFill(CGRectMake(0,0,1,44));
     UIImage *bg=UIGraphicsGetImageFromCurrentImageContext(); UIGraphicsEndImageContext();
     _searchBar.backgroundImage=bg;
+#ifdef MM_MODERN
+    MMRetroStyleSearchBar(_searchBar,[OJTheme darkMode]);
+    if([OJTheme darkMode]) return;
+#endif
     UITextField *tf=[self findTextField:_searchBar];
     if(tf) tf.textColor=[SpotTheme ink];
 }

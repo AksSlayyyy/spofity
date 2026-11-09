@@ -70,7 +70,7 @@ static UIImage* gripIcon(void){
     UINavigationBar *navBar=[MMNativeUI navigationBarWithTitle:L(@"Queue") width:W];
     navBar.topItem.rightBarButtonItem=[MMNativeUI doneItemTarget:self action:@selector(close)];
     [self.view addSubview:navBar];
-    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:UITableViewStyleGrouped];
+    _table=[[UITableView alloc] initWithFrame:CGRectMake(0,44,W,H-44) style:MMGroupedTableStyle];
     [OJTheme applyToGroupedTableView:_table];
     _table.backgroundColor=[UIColor clearColor]; _table.separatorStyle=UITableViewCellSeparatorStyleSingleLine; _table.rowHeight=52;
     _table.dataSource=self; _table.delegate=self; [self.view addSubview:_table];

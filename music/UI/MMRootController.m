@@ -34,7 +34,11 @@ static UIColor *AverageColorOfImage(UIImage *img) {
     CGColorSpaceRelease(cs);
     return [UIColor colorWithRed:px[0]/255.0 green:px[1]/255.0 blue:px[2]/255.0 alpha:1];
 }
-@interface MMRootController () <AVAudioSessionDelegate>   // iOS 5: Unterbrechungen kommen über den Session-Delegate
+#ifdef MM_MODERN
+@interface MMRootController ()
+#else
+@interface MMRootController () <AVAudioSessionDelegate>
+#endif   // iOS 5: Unterbrechungen kommen über den Session-Delegate
 @end
 
 @implementation MMRootController {
@@ -212,7 +216,11 @@ MM_IOS6_END
     // Auto/Bluetooth: Fernsteuer-Tasten + Unterbrechungen (sonst „streitet" es mit der Stock-Musik-App)
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioInterruption:) name:AVAudioSessionInterruptionNotification object:nil];
+#ifdef MM_MODERN
+    [self setupRemoteCommands];
+#else
     [(AVAudioSession *)[AVAudioSession sharedInstance] setDelegate:self];   // iOS 5 path; harmless (deprecated) on iOS 6
+#endif
     self.view = [[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view.backgroundColor=[SpotTheme pageBackground];
     CGFloat W=self.view.bounds.size.width, H=self.view.bounds.size.height;
@@ -280,6 +288,9 @@ MM_IOS6_END
     nativeTab.items=_tabBtns;
     nativeTab.selectedImageTintColor=[OJTheme accentColor];
     nativeTab.selectedItem=_tabBtns[0];
+#ifdef MM_MODERN
+    MMRetroStyleTabBar(nativeTab,[OJTheme accentColor]);
+#endif
     [self.view addSubview:_tabBar];
     } else [self buildPadShell];
     [self selectTab:0];
@@ -356,11 +367,15 @@ MM_IOS6_END
 
 - (void)themeChanged {
     _themeDirty=YES;
-    [[UIApplication sharedApplication] setStatusBarStyle:([OJTheme darkMode]?UIStatusBarStyleBlackOpaque:UIStatusBarStyleDefault) animated:NO];
+    MMStatusBarDark([OJTheme darkMode]);
     self.view.backgroundColor=[SpotTheme pageBackground];
     [OJTheme applyToToolbar:(UIToolbar*)_npBar];
     [OJTheme applyToToolbar:(UIToolbar*)_dlBar];
+#ifdef MM_MODERN
+    if(_tabBar) MMRetroStyleTabBar((UITabBar*)_tabBar,[OJTheme accentColor]);
+#else
     if(_tabBar) [(UITabBar*)_tabBar setSelectedImageTintColor:[OJTheme accentColor]];
+#endif
 }
 - (void)reloadTabControllers {
     UIViewController *old=_vcs[_sel];
@@ -403,7 +418,22 @@ MM_IOS6_END
     MM_IOS6_END
 }
 - (void)beginInterruption { [self interruptionBegan]; }   // iOS 5
+#ifdef MM_MODERN
+// Lock screen / Control Center / headphones on modern iOS (the old remote-control events alone no longer show the app there)
+- (void)setupRemoteCommands {
+    MPRemoteCommandCenter *cc=[MPRemoteCommandCenter sharedCommandCenter];
+    __weak MMRootController *ws=self;
+    [cc.playCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *e){ if(![MMAudio isPlaying]) [ws togglePlayPause]; return MPRemoteCommandHandlerStatusSuccess; }];
+    [cc.pauseCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *e){ if([MMAudio isPlaying]) [ws togglePlayPause]; return MPRemoteCommandHandlerStatusSuccess; }];
+    [cc.togglePlayPauseCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *e){ [ws togglePlayPause]; return MPRemoteCommandHandlerStatusSuccess; }];
+    [cc.nextTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *e){ [ws playNext]; return MPRemoteCommandHandlerStatusSuccess; }];
+    [cc.previousTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *e){ [ws playPrev]; return MPRemoteCommandHandlerStatusSuccess; }];
+    [cc.changePlaybackPositionCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *e){
+        [MMAudio seekTo:((MPChangePlaybackPositionCommandEvent *)e).positionTime]; [ws updateNowPlaying]; return MPRemoteCommandHandlerStatusSuccess; }];
+}
+#else
 - (void)endInterruptionWithFlags:(NSUInteger)flags { [self interruptionEndedResume:(flags & AVAudioSessionInterruptionFlags_ShouldResume)!=0]; }
+#endif
 - (void)interruptionBegan { [MMAudio setPaused:YES]; [self drawNpPlay]; [self updateNowPlaying]; }
 - (void)interruptionEndedResume:(BOOL)resume { if(resume){ [MMAudio setPaused:NO]; [self drawNpPlay]; [self updateNowPlaying]; } }
 // Angetippter Titel lädt: wie weit er da ist (grün in der Leiste und im Player); -1 = fertig/aus
@@ -797,7 +827,7 @@ static NSArray* shuffledFrom(NSArray*list,NSInteger idx){
 // Statusleiste (Netz, Uhrzeit, Akku) immer, außer im Cover Flow (Vollbild quer).
 - (void)updateStatusBar {
     BOOL full=(_cflow!=nil);
-    [[UIApplication sharedApplication] setStatusBarHidden:full withAnimation:UIStatusBarAnimationFade];
+    MMStatusBarHidden(full);
 }
 // ---- Cover Flow: die App selbst bleibt hochkant, die Ansicht wird um 90° gedreht eingeblendet ----
 - (void)orientationChanged {
