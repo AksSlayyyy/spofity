@@ -67,6 +67,8 @@ bundle: $(APP)
 	cp -R Resources/. $(BUNDLE)/
 	cp ResourcesModern/Info.plist $(BUNDLE)/Info.plist
 	cp ResourcesModern/*.png $(BUNDLE)/
+	xcrun actool ResourcesModern/Assets.xcassets --compile $(BUNDLE) --platform iphoneos --minimum-deployment-target $(MINOS) \
+	      --app-icon AppIcon --target-device iphone --target-device ipad --output-partial-info-plist build-modern/assets.plist --compress-pngs >/dev/null
 	rm -f $(BUNDLE)/Default*.png
 	plutil -convert binary1 $(BUNDLE)/Info.plist
 	mkdir -p $(BUNDLE)/Frameworks

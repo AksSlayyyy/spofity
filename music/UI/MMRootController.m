@@ -482,7 +482,15 @@ MM_IOS6_END
 - (void)pushContent:(UIViewController *)vc {
     [_pushedStack addObject:vc]; vc.view.frame=_content.bounds; vc.view.clipsToBounds=YES; [_content addSubview:vc.view];
     CGRect f=vc.view.frame; vc.view.frame=CGRectOffset(f,f.size.width,0);
+#ifdef MM_MODERN
+    // iOS 6 push: the old page slides out to the left while the new one comes in, 0.35 s ease-in-out
+    UIView *under=_pushedStack.count>1?((UIViewController*)_pushedStack[_pushedStack.count-2]).view:((UIViewController*)_vcs[_sel]).view;
+    CGRect uf=under.frame;
+    [UIView animateWithDuration:0.35 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{ vc.view.frame=f; under.frame=CGRectOffset(uf,-uf.size.width,0); }
+                     completion:^(BOOL x){ under.frame=uf; }];
+#else
     [UIView animateWithDuration:0.3 animations:^{ vc.view.frame=f; }];   // von rechts reinschieben wie bei iOS
+#endif
     // untere Leisten immer oben halten, damit sie nie von der Playlist verdeckt werden
     [self.view bringSubviewToFront:_dlBar]; [self.view bringSubviewToFront:_npBar]; [self.view bringSubviewToFront:_tabBar];
     [self keepOverlaysOnTop];
@@ -495,8 +503,16 @@ MM_IOS6_END
 - (void)popContent {
     UIViewController*vc=[_pushedStack lastObject]; if(!vc)return; [_pushedStack removeLastObject];
     if(!_pushedStack.count) [_sidebar setSelectedKey:_tabs[_sel]];
+#ifdef MM_MODERN
+    UIView *under=_pushedStack.count?((UIViewController*)_pushedStack.lastObject).view:((UIViewController*)_vcs[_sel]).view;
+    CGRect uf=under.frame; under.frame=CGRectOffset(uf,-uf.size.width,0);
+    [UIView animateWithDuration:0.35 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{ vc.view.frame=CGRectOffset(vc.view.frame,vc.view.frame.size.width,0); under.frame=uf; }
+                     completion:^(BOOL x){
+#else
     [UIView animateWithDuration:0.25 animations:^{ vc.view.frame=CGRectOffset(vc.view.frame,vc.view.frame.size.width,0); }
-                     completion:^(BOOL x){ [vc.view removeFromSuperview]; if(!_pushedStack.count){ if(_themeDirty){ _themeDirty=NO; [self reloadTabControllers]; [self selectTab:_sel]; } else [self tabShown]; } }];
+                     completion:^(BOOL x){
+#endif
+        [vc.view removeFromSuperview]; if(!_pushedStack.count){ if(_themeDirty){ _themeDirty=NO; [self reloadTabControllers]; [self selectTab:_sel]; } else [self tabShown]; } }];
 }
 - (BOOL)hasPushedContent { return _pushedStack.count>0; }
 // Tab-Seite wieder sichtbar: die Startseite zeichnet nur sichtbar neu und holt verdeckte Änderungen hier nach

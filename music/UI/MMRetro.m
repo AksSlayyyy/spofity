@@ -4,6 +4,8 @@
 #ifdef MM_MODERN
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <SystemConfiguration/SystemConfiguration.h>
+#import <netinet/in.h>
 
 #define MMRetroStatusH 20.0
 
@@ -141,20 +143,145 @@ static UIView *selectionView(BOOL isGray) {
 }
 @end
 
-static void swapClass(Class c, SEL a, SEL b) {
-    Method m1=class_getClassMethod(c,a), m2=class_getClassMethod(c,b);
-    if (m1 && m2) method_exchangeImplementations(m1,m2);
+static UIImage *spokesImage(CGFloat s, UIColor *color) {
+    return drawImage(CGSizeMake(s,s), ^(CGContextRef ctx){
+        CGFloat r=s/2, w=MAX(2,s*0.09);
+        for (int i=0;i<12;i++) {
+            CGContextSaveGState(ctx);
+            CGContextTranslateCTM(ctx,r,r); CGContextRotateCTM(ctx,-i*M_PI/6);   // trailing spokes fade counter-clockwise
+            [[color colorWithAlphaComponent:1.0-i*0.065] setFill];
+            [[UIBezierPath bezierPathWithRoundedRect:CGRectMake(-w/2,-r,w,r*0.48) cornerRadius:w/2] fill];
+            CGContextRestoreGState(ctx);
+        }
+    });
 }
-static void swapInstance(Class c, SEL a, SEL b) {
+static char kRetroSpin;
+@implementation UIActivityIndicatorView (MMRetro)
+- (void)mm_retroSpin {
+    CALayer *l=objc_getAssociatedObject(self,&kRetroSpin);
+    NSInteger st=self.activityIndicatorViewStyle;
+    BOOL large=(st==0 /* WhiteLarge */ || st==UIActivityIndicatorViewStyleLarge);
+    CGFloat s=large?37:20;
+    UIColor *c=self.color?:((st==2 /* Gray */ || st==UIActivityIndicatorViewStyleMedium || st==UIActivityIndicatorViewStyleLarge)?gray(0.45):[UIColor whiteColor]);
+    if (!l) {
+        l=[CALayer layer]; objc_setAssociatedObject(self,&kRetroSpin,l,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [self.layer addSublayer:l];
+    }
+    for (CALayer *x in self.layer.sublayers) if (x!=l) x.hidden=YES;   // hide the modern 8-spoke one
+    CGSize b=self.bounds.size;
+    l.frame=CGRectMake(floor((b.width-s)/2),floor((b.height-s)/2),s,s);
+    l.contentsScale=[UIScreen mainScreen].scale;
+    l.contents=(__bridge id)spokesImage(s,c).CGImage;
+    if (self.isAnimating) {
+        if (![l animationForKey:@"spin"]) {   // iOS 6 stepped the spokes round, one notch at a time
+            CAKeyframeAnimation *a=[CAKeyframeAnimation animationWithKeyPath:@"transform.rotation.z"];
+            NSMutableArray *v=[NSMutableArray array]; for (int i=0;i<=12;i++) [v addObject:@(i*M_PI/6)];
+            a.values=v; a.calculationMode=kCAAnimationDiscrete; a.duration=1.0; a.repeatCount=HUGE_VALF; a.removedOnCompletion=NO;
+            [l addAnimation:a forKey:@"spin"];
+        }
+    } else [l removeAnimationForKey:@"spin"];
+}
+- (void)mm_layoutSubviews { [self mm_layoutSubviews]; [self mm_retroSpin]; }
+- (void)mm_startAnimating { [self mm_startAnimating]; [self mm_retroSpin]; }
+- (void)mm_stopAnimating { [self mm_stopAnimating]; [self mm_retroSpin]; }
+@end
+
+// Safe swizzle: if the class only inherits the method (e.g. layoutSubviews from UIView), add it to this class
+// first, so the superclass (and every other subclass) is never touched.
+static void swapOn(Class c, SEL a, SEL b) {
     Method m1=class_getInstanceMethod(c,a), m2=class_getInstanceMethod(c,b);
-    if (m1 && m2) method_exchangeImplementations(m1,m2);
+    if (!m1 || !m2) return;
+    if (class_addMethod(c,a,method_getImplementation(m2),method_getTypeEncoding(m2)))
+        class_replaceMethod(c,b,method_getImplementation(m1),method_getTypeEncoding(m1));
+    else method_exchangeImplementations(m1,m2);
 }
+static void swapClass(Class c, SEL a, SEL b) { swapOn(object_getClass(c),a,b); }
+static void swapInstance(Class c, SEL a, SEL b) { swapOn(c,a,b); }
 
 #pragma mark - Status bar strip
 
 static UIWindow *gStatusWin;
-static UIImageView *gStatusImg;
 static BOOL gStatusDark=YES, gStatusHidden=NO;
+
+// The real status bar is hidden; this draws the iOS 6 one: signal + Wi-Fi left, clock centred, battery right.
+@interface MMRetroStatusBarView : UIView
+@property (nonatomic) BOOL dark;
+@end
+@implementation MMRetroStatusBarView {
+    NSTimer *_timer; SCNetworkReachabilityRef _reach;
+}
+- (instancetype)initWithFrame:(CGRect)f {
+    if ((self=[super initWithFrame:f])) {
+        self.opaque=YES; self.contentMode=UIViewContentModeRedraw;
+        [UIDevice currentDevice].batteryMonitoringEnabled=YES;
+        struct sockaddr_in a; memset(&a,0,sizeof a); a.sin_len=sizeof a; a.sin_family=AF_INET;
+        _reach=SCNetworkReachabilityCreateWithAddress(NULL,(const struct sockaddr *)&a);
+        __weak MMRetroStatusBarView *ws=self;
+        _timer=[NSTimer scheduledTimerWithTimeInterval:5 repeats:YES block:^(NSTimer *t){ [ws setNeedsDisplay]; }];
+        for (NSString *n in @[UIDeviceBatteryLevelDidChangeNotification,UIDeviceBatteryStateDidChangeNotification,UIApplicationDidBecomeActiveNotification])
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(setNeedsDisplay) name:n object:nil];
+    }
+    return self;
+}
+- (void)setDark:(BOOL)d { _dark=d; [self setNeedsDisplay]; }
+- (void)drawRect:(CGRect)rect {
+    CGContextRef ctx=UIGraphicsGetCurrentContext();
+    CGFloat W=self.bounds.size.width, H=self.bounds.size.height;
+    if (self.dark) { [gray(0) setFill]; UIRectFill(self.bounds); }
+    else { CGFloat l[]={0,1}; fillGradient(ctx,self.bounds,@[gray(0.93),gray(0.72)],l); [gray(0.45) setFill]; UIRectFill(CGRectMake(0,H-1,W,1)); }
+    UIColor *ink=self.dark?[UIColor whiteColor]:gray(0.10);
+    NSShadow *sh=self.dark?nil:textShadow([UIColor colorWithWhite:1 alpha:0.6],1);
+    NSMutableDictionary *bold=[@{NSFontAttributeName:helv(14,YES),NSForegroundColorAttributeName:ink} mutableCopy];
+    NSMutableDictionary *small=[@{NSFontAttributeName:helv(12,YES),NSForegroundColorAttributeName:ink} mutableCopy];
+    if (sh) { bold[NSShadowAttributeName]=sh; small[NSShadowAttributeName]=sh; }
+    if (sh) CGContextSetShadowWithColor(ctx,CGSizeMake(0,1),0,[UIColor colorWithWhite:1 alpha:0.6].CGColor);
+    [ink setFill]; [ink setStroke];
+    // signal bars (iOS 6: five rising bars)
+    CGFloat x=6;
+    for (int i=0;i<5;i++) { CGFloat bh=3+i*2; UIRectFill(CGRectMake(x+i*3.5,H-5-bh,2.5,bh)); }
+    x+=5*3.5+5;
+    // Wi-Fi fan when on Wi-Fi
+    SCNetworkReachabilityFlags fl=0; BOOL wifi=NO;
+    if (_reach && SCNetworkReachabilityGetFlags(_reach,&fl)) wifi=(fl & kSCNetworkReachabilityFlagsReachable) && !(fl & kSCNetworkReachabilityFlagsIsWWAN);
+    if (wifi) {
+        CGPoint c=CGPointMake(x+7,H-4.5);
+        for (int i=0;i<3;i++) {
+            CGFloat r=3.5+i*3.3;
+            UIBezierPath *p=[UIBezierPath bezierPath];
+            if (i==0) { [p moveToPoint:c]; [p addArcWithCenter:c radius:r startAngle:-M_PI*0.75 endAngle:-M_PI*0.25 clockwise:YES]; [p closePath]; [p fill]; }
+            else { p=[UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:-M_PI*0.75 endAngle:-M_PI*0.25 clockwise:YES]; p.lineWidth=1.8; [p stroke]; }
+        }
+    } else {
+        [@"3G" drawAtPoint:CGPointMake(x,(H-15)/2) withAttributes:small];
+    }
+    // clock
+    static NSDateFormatter *df; if (!df) { df=[NSDateFormatter new]; df.timeStyle=NSDateFormatterShortStyle; df.dateStyle=NSDateFormatterNoStyle; }
+    NSString *t=[df stringFromDate:[NSDate date]];
+    CGSize ts=[t sizeWithAttributes:bold];
+    [t drawAtPoint:CGPointMake(floor((W-ts.width)/2),floor((H-ts.height)/2)) withAttributes:bold];
+    // battery: "81 %" + outline with fill (bolt while charging)
+    float lvl=[UIDevice currentDevice].batteryLevel; if (lvl<0) lvl=1;
+    UIDeviceBatteryState bs=[UIDevice currentDevice].batteryState;
+    BOOL charging=(bs==UIDeviceBatteryStateCharging || bs==UIDeviceBatteryStateFull);
+    CGRect bat=CGRectMake(W-6-25,(H-11)/2,22,11);
+    UIBezierPath *outline=[UIBezierPath bezierPathWithRoundedRect:CGRectInset(bat,0.5,0.5) cornerRadius:1.5]; outline.lineWidth=1; [outline stroke];
+    UIRectFill(CGRectMake(CGRectGetMaxX(bat),bat.origin.y+3.5,2,4));
+    UIColor *fillC=charging?[UIColor colorWithRed:0.30 green:0.85 blue:0.30 alpha:1]:ink;
+    [fillC setFill]; UIRectFill(CGRectMake(bat.origin.x+2,bat.origin.y+2,MAX(1,(bat.size.width-4)*lvl),bat.size.height-4));
+    if (charging) {
+        CGContextSetShadowWithColor(ctx,CGSizeZero,1,[UIColor colorWithWhite:0 alpha:0.6].CGColor);
+        [[UIColor whiteColor] setFill];
+        UIBezierPath *bolt=[UIBezierPath bezierPath]; CGFloat bx=CGRectGetMidX(bat), by=bat.origin.y;
+        [bolt moveToPoint:CGPointMake(bx+1.5,by-1)]; [bolt addLineToPoint:CGPointMake(bx-3,by+6)]; [bolt addLineToPoint:CGPointMake(bx,by+6)];
+        [bolt addLineToPoint:CGPointMake(bx-1.5,by+12)]; [bolt addLineToPoint:CGPointMake(bx+3,by+5)]; [bolt addLineToPoint:CGPointMake(bx,by+5)]; [bolt closePath]; [bolt fill];
+        CGContextSetShadowWithColor(ctx,CGSizeZero,0,NULL);
+    }
+    NSString *pct=[NSString stringWithFormat:@"%d %%",(int)lroundf(lvl*100)];
+    CGSize ps=[pct sizeWithAttributes:small];
+    [pct drawAtPoint:CGPointMake(bat.origin.x-4-ps.width,floor((H-ps.height)/2)) withAttributes:small];
+}
+@end
+static MMRetroStatusBarView *gStatusView;
 
 static void updateStatusStrip(void) {
     if (!gStatusWin) {
@@ -167,28 +294,21 @@ static void updateStatusStrip(void) {
         UIViewController *vc=[UIViewController new];
         vc.view.backgroundColor=[UIColor clearColor]; vc.view.userInteractionEnabled=NO;
         gStatusWin.rootViewController=vc;
-        gStatusImg=[[UIImageView alloc] initWithFrame:vc.view.bounds];
-        gStatusImg.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
-        gStatusImg.contentMode=UIViewContentModeScaleToFill;
-        [vc.view addSubview:gStatusImg];
+        gStatusView=[[MMRetroStatusBarView alloc] initWithFrame:vc.view.bounds];
+        gStatusView.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
+        [vc.view addSubview:gStatusView];
     }
-    if (gStatusDark) gStatusImg.image=drawImage(CGSizeMake(4,MMRetroStatusH), ^(CGContextRef ctx){ [gray(0) setFill]; UIRectFill(CGRectMake(0,0,4,MMRetroStatusH)); });
-    else gStatusImg.image=drawImage(CGSizeMake(4,MMRetroStatusH), ^(CGContextRef ctx){
-        CGFloat locs[]={0,1}; fillGradient(ctx,CGRectMake(0,0,4,MMRetroStatusH),@[gray(0.93),gray(0.72)],locs);
-        [gray(0.45) setFill]; UIRectFill(CGRectMake(0,MMRetroStatusH-1,4,1));
-    });
+    gStatusView.dark=gStatusDark;
     gStatusWin.hidden=gStatusHidden;
 }
 
 void MMStatusBarDark(BOOL dark) {
     gStatusDark=dark;
-    UIStatusBarStyle st=dark?UIStatusBarStyleLightContent:UIStatusBarStyleDarkContent;
-    [[UIApplication sharedApplication] setStatusBarStyle:st animated:NO];
-    updateStatusStrip();
+    updateStatusStrip();   // the real status bar stays hidden; spofity draws the iOS 6 one
 }
 void MMStatusBarHidden(BOOL hidden) {
     gStatusHidden=hidden;
-    [[UIApplication sharedApplication] setStatusBarHidden:hidden withAnimation:UIStatusBarAnimationFade];
+    [[UIApplication sharedApplication] setStatusBarHidden:YES withAnimation:UIStatusBarAnimationNone];
     updateStatusStrip();
 }
 
@@ -228,7 +348,8 @@ void MMStatusBarHidden(BOOL hidden) {
         UIViewController *c=MMRetroBelowStatusBar(vc);
         [c setValue:@YES forKey:@"clearBackground"];
         c.modalPresentationStyle=UIModalPresentationOverFullScreen;
-        c.modalTransitionStyle=vc.modalTransitionStyle;
+        static MMRetroSlide *slide2; if (!slide2) slide2=[MMRetroSlide new];
+        c.transitioningDelegate=slide2;
         [self mm_presentViewController:c animated:animated completion:completion];
         return;
     }
@@ -258,11 +379,39 @@ void MMStatusBarHidden(BOOL hidden) {
 UIViewController *MMRetroBelowStatusBar(UIViewController *vc) {
     MMRetroStatusContainer *c=[MMRetroStatusContainer new]; c.inner=vc; return c;
 }
+@interface MMRetroSlide : NSObject <UIViewControllerAnimatedTransitioning, UIViewControllerTransitioningDelegate>
+@property (nonatomic) BOOL presenting;
+@end
+@implementation MMRetroSlide
+- (NSTimeInterval)transitionDuration:(id<UIViewControllerContextTransitioning>)c { return 0.4; }
+- (void)animateTransition:(id<UIViewControllerContextTransitioning>)c {
+    UIView *box=c.containerView; CGFloat H=box.bounds.size.height;
+    if (self.presenting) {
+        UIViewController *to=[c viewControllerForKey:UITransitionContextToViewControllerKey];
+        UIView *v=[c viewForKey:UITransitionContextToViewKey]?:to.view;
+        CGRect f=[c finalFrameForViewController:to]; if (CGRectIsEmpty(f)) f=box.bounds;
+        v.frame=CGRectOffset(f,0,H); [box addSubview:v];
+        [UIView animateWithDuration:0.4 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{ v.frame=f; }
+                         completion:^(BOOL d){ [c completeTransition:!c.transitionWasCancelled]; }];
+    } else {
+        UIViewController *from=[c viewControllerForKey:UITransitionContextFromViewControllerKey];
+        UIView *v=[c viewForKey:UITransitionContextFromViewKey]?:from.view;
+        [UIView animateWithDuration:0.4 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{ v.frame=CGRectOffset(v.frame,0,H); }
+                         completion:^(BOOL d){ if (!c.transitionWasCancelled) [v removeFromSuperview]; [c completeTransition:!c.transitionWasCancelled]; }];
+    }
+}
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)p presentingController:(UIViewController *)pr sourceController:(UIViewController *)s {
+    MMRetroSlide *a=[MMRetroSlide new]; a.presenting=YES; return a;
+}
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)d { return [MMRetroSlide new]; }
+@end
+
 void MMRetroPresent(UIViewController *presenter, UIViewController *vc) {
     if ([UIDevice currentDevice].userInterfaceIdiom!=UIUserInterfaceIdiomPhone) { [presenter presentViewController:vc animated:YES completion:nil]; return; }
     MMRetroStatusContainer *c=[MMRetroStatusContainer new]; c.inner=vc; c.clearBackground=YES;
     c.modalPresentationStyle=UIModalPresentationOverFullScreen;
-    c.modalTransitionStyle=UIModalTransitionStyleCoverVertical;
+    static MMRetroSlide *slide; if (!slide) slide=[MMRetroSlide new];
+    c.transitioningDelegate=slide;
     [presenter presentViewController:c animated:YES completion:nil];
 }
 UIViewController *MMRetroUnwrap(UIViewController *vc) {
@@ -279,6 +428,10 @@ void MMRetroInstall(void) {
     swapInstance([UIScreen class],@selector(applicationFrame),@selector(mm_applicationFrame));
     swapInstance([UIViewController class],@selector(presentViewController:animated:completion:),@selector(mm_presentViewController:animated:completion:));
     swapInstance([UIToolbar class],@selector(layoutSubviews),@selector(mm_layoutSubviews));
+    swapInstance([UIActivityIndicatorView class],@selector(layoutSubviews),@selector(mm_layoutSubviews));
+    swapInstance([UIActivityIndicatorView class],@selector(startAnimating),@selector(mm_startAnimating));
+    swapInstance([UIActivityIndicatorView class],@selector(stopAnimating),@selector(mm_stopAnimating));
+    [[UIApplication sharedApplication] setStatusBarHidden:YES withAnimation:UIStatusBarAnimationNone];
     swapInstance([UITableViewCell class],@selector(initWithStyle:reuseIdentifier:),@selector(mm_initWithStyle:reuseIdentifier:));
     swapInstance([UITableViewCell class],@selector(setSelectionStyle:),@selector(mm_setSelectionStyle:));
 
@@ -411,6 +564,9 @@ void MMRetroStyleSearchBar(UISearchBar *bar, BOOL dark) {
     bar.searchTextField.font=helv(15,NO);
     bar.searchTextField.textColor=[UIColor blackColor];
     bar.searchTextField.backgroundColor=[UIColor clearColor];
+    bar.searchTextField.keyboardAppearance=UIKeyboardAppearanceLight;
+    bar.searchTextField.returnKeyType=UIReturnKeySearch;
+    bar.searchTextField.enablesReturnKeyAutomatically=YES;
     bar.searchTextPositionAdjustment=UIOffsetMake(2,0);
     if (dark) bar.backgroundImage=barImage(gray(0.30),44);
 }
