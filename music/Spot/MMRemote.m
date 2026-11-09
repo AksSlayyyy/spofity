@@ -5,11 +5,27 @@
 #ifdef MM_MODERN
 #import <UIKit/UIKit.h>
 #import <SpotifyiOS/SpotifyiOS.h>
+#import <AuthenticationServices/AuthenticationServices.h>
+#import <CommonCrypto/CommonDigest.h>
 
 static NSString *const kEnabledKey=@"MMRemoteEnabled";
 static NSString *const kTokenKey=@"MMRemoteToken";
+static NSString *const kRefreshKey=@"MMRemoteRefresh";
+static NSString *const kExpiryKey=@"MMRemoteExpiry";
+static NSString *const kScopes=@"app-remote-control user-modify-playback-state user-read-playback-state user-read-currently-playing";
 
-@interface MMRemoteImpl : NSObject <SPTAppRemoteDelegate, SPTAppRemotePlayerStateDelegate>
+static NSString *b64url(NSData *d) {
+    return [[[[d base64EncodedStringWithOptions:0] stringByReplacingOccurrencesOfString:@"+" withString:@"-"]
+             stringByReplacingOccurrencesOfString:@"/" withString:@"_"] stringByReplacingOccurrencesOfString:@"=" withString:@""];
+}
+static NSString *formEnc(NSString *s) {
+    NSMutableCharacterSet *ok=[[NSCharacterSet alphanumericCharacterSet] mutableCopy]; [ok addCharactersInString:@"-._~"];
+    return [s stringByAddingPercentEncodingWithAllowedCharacters:ok];
+}
+
+@interface MMRemoteImpl : NSObject <SPTAppRemoteDelegate, SPTAppRemotePlayerStateDelegate, ASWebAuthenticationPresentationContextProviding>
+@property (nonatomic, strong) ASWebAuthenticationSession *webAuth;
+@property (nonatomic) BOOL triedAppAuthorize;
 @property (nonatomic, strong) SPTAppRemote *remote;
 @property (nonatomic, copy) NSString *clientID;
 @property (nonatomic, copy) NSString *wantedURI;          // the song spofity asked for
@@ -45,6 +61,91 @@ static MMRemoteImpl *gImpl;
     if (d) dispatch_async(dispatch_get_main_queue(), ^{ d(ok, ok?nil:@"Spotify app"); });
 }
 
+#pragma mark In-app Spotify login (PKCE) - no browser, no Spotify-app approval page
+
+- (ASPresentationAnchor)presentationAnchorForWebAuthenticationSession:(ASWebAuthenticationSession *)session {
+    for (UIWindow *w in [UIApplication sharedApplication].windows) if (w.isKeyWindow) return w;
+    return [UIApplication sharedApplication].windows.firstObject;
+}
+
+- (void)saveTokenJSON:(NSDictionary *)j {
+    NSUserDefaults *u=[NSUserDefaults standardUserDefaults];
+    if ([j[@"access_token"] length]) [u setObject:j[@"access_token"] forKey:kTokenKey];
+    if ([j[@"refresh_token"] length]) [u setObject:j[@"refresh_token"] forKey:kRefreshKey];
+    [u setDouble:[NSDate timeIntervalSinceReferenceDate]+MAX(60,[j[@"expires_in"] doubleValue])-120 forKey:kExpiryKey];
+    [u synchronize];
+}
+
+- (void)tokenRequest:(NSString *)body done:(void (^)(NSString *tok, NSString *err))done {
+    NSMutableURLRequest *rq=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://accounts.spotify.com/api/token"]];
+    rq.HTTPMethod=@"POST"; rq.HTTPBody=[body dataUsingEncoding:NSUTF8StringEncoding];
+    [rq setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
+    [[[NSURLSession sharedSession] dataTaskWithRequest:rq completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
+        NSDictionary *j=d?[NSJSONSerialization JSONObjectWithData:d options:0 error:NULL]:nil;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([j isKindOfClass:[NSDictionary class]] && [j[@"access_token"] length]) { [self saveTokenJSON:j]; done(j[@"access_token"],nil); }
+            else done(nil,[NSString stringWithFormat:@"Spotify login failed: %@",
+                           ([j isKindOfClass:[NSDictionary class]]?(j[@"error_description"]?:j[@"error"]):nil)?:e.localizedDescription?:@"no answer"]);
+        });
+    }] resume];
+}
+
+// A valid access token: stored, refreshed, or from a new in-app login.
+- (void)withToken:(void (^)(NSString *tok, NSString *err))done {
+    NSUserDefaults *u=[NSUserDefaults standardUserDefaults];
+    NSString *tok=[u stringForKey:kTokenKey], *ref=[u stringForKey:kRefreshKey];
+    if (tok.length && [u doubleForKey:kExpiryKey]>[NSDate timeIntervalSinceReferenceDate]) { done(tok,nil); return; }
+    if (ref.length) {
+        [self tokenRequest:[NSString stringWithFormat:@"grant_type=refresh_token&refresh_token=%@&client_id=%@",formEnc(ref),formEnc(self.clientID)]
+                      done:^(NSString *t, NSString *err) { if (t) done(t,nil); else { [u removeObjectForKey:kRefreshKey]; [self webLogin:done]; } }];
+        return;
+    }
+    [self webLogin:done];
+}
+
+- (void)webLogin:(void (^)(NSString *tok, NSString *err))done {
+    if (self.webAuth) return;
+    unsigned char rnd[48]; arc4random_buf(rnd,sizeof rnd);
+    NSString *verifier=b64url([NSData dataWithBytes:rnd length:sizeof rnd]);
+    NSData *vd=[verifier dataUsingEncoding:NSUTF8StringEncoding];
+    unsigned char sha[CC_SHA256_DIGEST_LENGTH]; CC_SHA256(vd.bytes,(CC_LONG)vd.length,sha);
+    NSString *challenge=b64url([NSData dataWithBytes:sha length:sizeof sha]);
+    NSString *redirect=[MMRemote redirectURI];
+    NSString *url=[NSString stringWithFormat:@"https://accounts.spotify.com/authorize?client_id=%@&response_type=code&redirect_uri=%@&scope=%@&code_challenge_method=S256&code_challenge=%@",
+                   formEnc(self.clientID),formEnc(redirect),formEnc(kScopes),challenge];
+    __weak MMRemoteImpl *ws=self;
+    self.webAuth=[[ASWebAuthenticationSession alloc] initWithURL:[NSURL URLWithString:url] callbackURLScheme:@"spofity"
+                                               completionHandler:^(NSURL *cb, NSError *e) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            MMRemoteImpl *ss=ws; ss.webAuth=nil;
+            NSString *code=nil, *err=nil;
+            for (NSURLQueryItem *q in [NSURLComponents componentsWithURL:cb resolvingAgainstBaseURL:NO].queryItems) {
+                if ([q.name isEqualToString:@"code"]) code=q.value;
+                if ([q.name isEqualToString:@"error"]) err=q.value;
+            }
+            if (!code) {
+                if (e.code==ASWebAuthenticationSessionErrorCodeCanceledLogin) { done(nil,nil); return; }   // user closed it
+                done(nil,[NSString stringWithFormat:@"Spotify login didn't finish (%@).\n\nCheck your Spotify developer app: Redirect URI %@ must be added and saved.",
+                          err?:e.localizedDescription?:@"no code",redirect]);
+                return;
+            }
+            [ss tokenRequest:[NSString stringWithFormat:@"grant_type=authorization_code&code=%@&redirect_uri=%@&client_id=%@&code_verifier=%@",
+                              formEnc(code),formEnc(redirect),formEnc(ss.clientID),verifier] done:done];
+        });
+    }];
+    self.webAuth.presentationContextProvider=self;
+    self.webAuth.prefersEphemeralWebBrowserSession=NO;
+    if (![self.webAuth start]) { self.webAuth=nil; done(nil,@"Couldn't open the Spotify login."); }
+}
+
+- (void)connectWithToken {
+    [self withToken:^(NSString *tok, NSString *err) {
+        if (!tok) { [self finish:NO error:err]; return; }
+        self.remote.connectionParameters.accessToken=tok;
+        [self.remote connect];
+    }];
+}
+
 - (void)authorize {
     if (self.authorizing) return;
     self.authorizing=YES;
@@ -70,14 +171,18 @@ static MMRemoteImpl *gImpl;
 
 #pragma mark SPTAppRemoteDelegate
 - (void)appRemoteDidEstablishConnection:(SPTAppRemote *)appRemote {
-    self.authorizing=NO;
+    self.authorizing=NO; self.triedAppAuthorize=NO;
     appRemote.playerAPI.delegate=self;
     [appRemote.playerAPI subscribeToPlayerState:nil];
     [self playPending];
 }
 - (void)appRemote:(SPTAppRemote *)appRemote didFailConnectionAttemptWithError:(NSError *)error {
-    // Token expired or the Spotify app isn't running: authorize again (only if a song is waiting).
-    if (self.pendingURI) { self.authorizing=NO; [self authorize]; }
+    if (!self.pendingURI) return;
+    // Usually the Spotify app isn't running. Wake it once through the SDK (it starts the song and comes back);
+    // if that doesn't work either, ask the user to open Spotify once.
+    if (!self.triedAppAuthorize) { self.triedAppAuthorize=YES; self.authorizing=NO; [self authorize]; return; }
+    [self finish:NO error:@"Couldn't reach the Spotify app.\n\nOpen Spotify, play any song for a second, then come back to Spofity and tap the song again."];
+    self.pendingURI=nil;
 }
 - (void)appRemote:(SPTAppRemote *)appRemote didDisconnectWithError:(NSError *)error {}
 
@@ -113,6 +218,7 @@ static MMRemoteImpl *gImpl;
     NSString *tok=p[SPTAppRemoteAccessTokenKey];
     if (tok.length) {
         [[NSUserDefaults standardUserDefaults] setObject:tok forKey:kTokenKey];
+        [[NSUserDefaults standardUserDefaults] setDouble:[NSDate timeIntervalSinceReferenceDate]+3300 forKey:kExpiryKey];
         m.remote.connectionParameters.accessToken=tok;
         // authorizeAndPlayURI already started the song in the Spotify app; connecting just takes over control.
         if (m.pendingURI) { m.wantedURI=m.pendingURI; m.pendingURI=nil; m.ended=NO; [m finish:YES error:nil]; }
@@ -127,6 +233,7 @@ static MMRemoteImpl *gImpl;
 
 + (void)appDidBecomeActive {
     MMRemoteImpl *m=gImpl;
+    if (!m.webAuth) m.authorizing=NO;   // came back from Spotify without an answer: allow a new attempt
     if (m.remote && !m.remote.isConnected && m.remote.connectionParameters.accessToken.length) [m.remote connect];
 }
 
@@ -139,8 +246,7 @@ static MMRemoteImpl *gImpl;
     if (m.pendingDone) [m finish:NO error:nil];   // an older request is superseded
     m.pendingDone=done; m.pendingURI=uri;
     if (r.isConnected) [m playPending];
-    else if (r.connectionParameters.accessToken.length) [r connect];   // fails over to authorize in the delegate
-    else [m authorize];
+    else { m.triedAppAuthorize=NO; [m connectWithToken]; }   // in-app login if needed, then connect
 }
 
 + (BOOL)isPlaying { MMRemoteImpl *m=gImpl; return m.remote.isConnected && m.stateURI && !m.statePaused && !m.ended; }

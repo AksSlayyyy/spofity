@@ -36,7 +36,7 @@ CFLAGS    += -DDEBUG
 endif
 FRAMEWORKS:= -framework UIKit -framework CoreGraphics -framework Foundation -framework QuartzCore \
              -framework AVFoundation -framework AudioToolbox -framework Security -framework MediaPlayer \
-             -framework SystemConfiguration
+             -framework SystemConfiguration -framework AuthenticationServices
 LDFLAGS   := $(ARCH) -fobjc-arc -L$(MBED)/lib -lmbedtls -lmbedx509 -lmbedcrypto -ObjC \
              -F$(SPOT) -framework SpotifyiOS -Wl,-rpath,@executable_path/Frameworks
 
