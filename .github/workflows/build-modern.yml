@@ -1,5 +1,8 @@
 name: Build Spofity (modern iOS)
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ main, modern ]
@@ -9,7 +12,7 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Build against the iOS 26 SDK: apps built with it keep honoring UIDesignRequiresCompatibility
       # (no Liquid Glass) and don't need the UIScene lifecycle, also when they run on iOS 27.
@@ -49,3 +52,26 @@ jobs:
         with:
           name: Spofity-modern-ipa
           path: Spofity-modern.ipa
+
+      - name: Check the app bundle
+        run: |
+          A=Payload/Spofity.app
+          ls -la $A | head -50
+          lipo -info $A/Spofity
+          otool -l $A/Spofity | grep -A4 LC_BUILD_VERSION
+          otool -L $A/Spofity
+          plutil -lint $A/Info.plist
+          plutil -p $A/Info.plist | grep -E "MinimumOSVersion|UIDesignRequiresCompatibility|CFBundleIdentifier|UILaunchScreen"
+          nm -m $A/Spofity | grep -E "MMRetroSwitch|MMAlertView|MMActionSheet|MMRetroPresentation" | head
+          codesign -dv $A 2>&1 | head -5
+          ls -la Spofity-modern.ipa
+
+      - name: Publish to Releases (download the .ipa there)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=ios-modern-latest
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" Spofity-modern.ipa --target "$GITHUB_SHA" --prerelease \
+            --title "Spofity for modern iOS (build ${{ github.run_number }})" \
+            --notes "Unsigned .ipa for iOS 15+ (tested target: iPhone SE 3 on iOS 27). Install with Sideloadly or AltStore; they sign it with your Apple ID. Commit: $GITHUB_SHA"
