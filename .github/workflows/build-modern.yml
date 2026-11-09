@@ -37,6 +37,12 @@ jobs:
           vendor/mbedtls/fetch.sh
           vendor/mbedtls/build-modern.sh
 
+      - name: Fetch Spotify iOS SDK
+        run: |
+          git clone -q https://github.com/spotify/ios-sdk vendor/spotify-ios-sdk
+          git -C vendor/spotify-ios-sdk checkout -q 8d3a71d
+          ls vendor/spotify-ios-sdk/SpotifyiOS.xcframework/ios-arm64
+
       - name: Build app
         run: make -f Makefile.modern -j4 ipa 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
 
@@ -62,7 +68,8 @@ jobs:
           otool -L $A/Spofity
           plutil -lint $A/Info.plist
           plutil -p $A/Info.plist | grep -E "MinimumOSVersion|UIDesignRequiresCompatibility|CFBundleIdentifier|UILaunchScreen"
-          nm -m $A/Spofity | grep -E "MMRetroSwitch|MMAlertView|MMActionSheet|MMRetroPresentation" | head
+          nm -m $A/Spofity | grep -E "MMRetroSwitch|MMAlertView|MMRemoteImpl" | head
+          ls -la $A/Frameworks
           codesign -dv $A 2>&1 | head -5
           ls -la Spofity-modern.ipa
 

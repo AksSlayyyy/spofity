@@ -7,6 +7,7 @@
 #import "MMLibraryController.h"
 #import "MMPlayerController.h"
 #import "MMSpotify.h"
+#import "MMRemote.h"
 #import "MMSheet.h"
 #import "MMCoverFlowView.h"
 #import "MMKeepAlive.h"
@@ -796,6 +797,15 @@ static NSArray* shuffledFrom(NSArray*list,NSInteger idx){
     [[[UIAlertView alloc] initWithTitle:L(@"Can't reach Spotify") message:L(@"This network seems to block Spotify's ports (4070, 443 and 80), so songs can't load. Library and search still work. Try another Wi-Fi or mobile data.") delegate:nil cancelButtonTitle:L(@"OK") otherButtonTitles:nil] show];
 }
 - (void)keysRefused {
+#ifdef MM_MODERN
+    // Newer accounts: no song keys for third-party players. Switch to playing through the official Spotify app.
+    if(![MMRemote enabled]){
+        [MMRemote setEnabled:YES];
+        [[[UIAlertView alloc] initWithTitle:L(@"Playing through Spotify") message:[NSString stringWithFormat:L(@"Spotify doesn't give song keys to newer accounts in apps like Spofity, so songs now play through the official Spotify app (it needs to be installed). Spofity stays your player: library, queue, Cover Flow and controls work as before.\n\nThe first time, Spotify opens briefly to ask for permission. In your Spotify developer app (the one for search), add:\n\nRedirect URI: %@\nBundle ID: %@"),[MMRemote redirectURI],[NSBundle mainBundle].bundleIdentifier] delegate:nil cancelButtonTitle:L(@"OK") otherButtonTitles:nil] show];
+        if(_curId) [self playTrackId:_curId title:_curTitle artist:_curArtist cover:_curCover];
+    }
+    return;
+#endif
     [[[UIAlertView alloc] initWithTitle:L(@"Your Spotify account is too new") message:L(@"Spotify doesn't give song keys to new accounts in older apps like Spofity, so songs can't play or download. Library and search still work.\n\nSpotify blocks this on their side, so Spofity can't fix it. To play music, log in with an older Premium account (Settings, Log out). If your account isn't new, try again later.") delegate:nil cancelButtonTitle:L(@"OK") otherButtonTitles:nil] show];
 }
 - (void)notPremium {
@@ -885,7 +895,7 @@ static NSArray* shuffledFrom(NSArray*list,NSInteger idx){
     [self presentViewController:[[MMQueueController alloc] init] animated:YES completion:nil];
 }
 - (void)openPlayer {
-    if([self.presentedViewController isKindOfClass:[MMPlayerController class]]) return;  // schon offen
+    if([MMRetroUnwrap(self.presentedViewController) isKindOfClass:[MMPlayerController class]]) return;  // schon offen
     if(self.presentedViewController){ [self dismissViewControllerAnimated:NO completion:nil]; }
     MMPlayerController*pc=[[MMPlayerController alloc] init];
     pc.trackTitle=_curTitle; pc.trackArtist=_curArtist; pc.coverURL=_curCover;

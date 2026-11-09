@@ -59,6 +59,7 @@ void MMLog(NSString *fmt, ...) NS_FORMAT_FUNCTION(1,2);   // ins App-Log (Librar
 + (BOOL)isLoading;   // true während ein Track geladen/entschlüsselt wird
 // Eigener Spotify-Entwickler-Schlüssel (nur für die Suche). Wird vor dem Speichern bei Spotify geprüft.
 + (BOOL)hasSearchKey;
++ (NSString *)searchKeyId;
 + (void)saveSearchKeyId:(NSString *)cid secret:(NSString *)sec completion:(void(^)(BOOL ok, NSString *error))done;
 + (void)removeSearchKey;
 // Abmelden: Wiedergabe und Downloads stoppen, Verbindung trennen, Anmeldung/Tokens, alle Downloads, Playlisten,

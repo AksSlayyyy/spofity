@@ -1,3 +1,4 @@
+#import "MMRemote.h"
 #import "MMKeepAlive.h"
 #import "MMSpotify.h"
 #import "MMAudio.h"
@@ -45,6 +46,9 @@ static BOOL enoughPower(void){
 }
 // Im Hintergrund: Stille an, wenn geladen wird, keine Musik läuft und genug Akku da ist
 + (void)check {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) return;   // the Spotify app plays; a silent player here would interrupt it
+#endif
     BOOL need=[self enabled] && [MMSpotify isDownloading] && ![MMAudio isPlaying] && enoughPower();
     if(need && !gSilence.playing){
         [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:NULL];

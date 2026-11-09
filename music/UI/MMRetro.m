@@ -218,13 +218,19 @@ void MMStatusBarHidden(BOOL hidden) {
 
 @implementation UIViewController (MMRetro)
 - (void)mm_presentViewController:(UIViewController *)vc animated:(BOOL)animated completion:(void (^)(void))completion {
-    static MMRetroModalDelegate *del; if (!del) del=[MMRetroModalDelegate new];
+    // Wrap spofity's full-screen modals (player, queue, sheets) in a container that keeps them below the
+    // status bar, presented over full screen (not as a modern card), like iOS 6.
     BOOL phone=([UIDevice currentDevice].userInterfaceIdiom==UIUserInterfaceIdiomPhone);
     UIModalPresentationStyle st=vc.modalPresentationStyle;
-    BOOL ours=[NSStringFromClass([vc class]) hasPrefix:@"MM"] || [vc isKindOfClass:[UINavigationController class]];
+    BOOL ours=([NSStringFromClass([vc class]) hasPrefix:@"MM"] || [vc isKindOfClass:[UINavigationController class]])
+              && ![NSStringFromClass([vc class]) hasPrefix:@"MMRetro"];
     if (ours && (phone || st==UIModalPresentationFullScreen) && st!=UIModalPresentationFormSheet && st!=UIModalPresentationPopover) {
-        vc.modalPresentationStyle=UIModalPresentationCustom;
-        vc.transitioningDelegate=del;
+        UIViewController *c=MMRetroBelowStatusBar(vc);
+        [c setValue:@YES forKey:@"clearBackground"];
+        c.modalPresentationStyle=UIModalPresentationOverFullScreen;
+        c.modalTransitionStyle=vc.modalTransitionStyle;
+        [self mm_presentViewController:c animated:animated completion:completion];
+        return;
     }
     [self mm_presentViewController:vc animated:animated completion:completion];
 }
@@ -233,11 +239,12 @@ void MMStatusBarHidden(BOOL hidden) {
 // Root view controllers built for iOS 6 (login) expect their view to start below the status bar.
 @interface MMRetroStatusContainer : UIViewController
 @property (nonatomic, strong) UIViewController *inner;
+@property (nonatomic) BOOL clearBackground;
 @end
 @implementation MMRetroStatusContainer
 - (void)loadView {
     self.view=[[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    self.view.backgroundColor=[UIColor blackColor];
+    self.view.backgroundColor=self.clearBackground?[UIColor clearColor]:[UIColor blackColor];
     [self addChildViewController:self.inner];
     UIView *v=self.inner.view;
     v.frame=CGRectMake(0,MMRetroStatusH,self.view.bounds.size.width,self.view.bounds.size.height-MMRetroStatusH);
@@ -349,14 +356,18 @@ void MMRetroStyleTabBar(UITabBar *bar, UIColor *accent) {
         fillGradient(ctx,CGRectMake(0,0,8,h),@[gray(0.22),gray(0.13),gray(0.05),gray(0.0)],locs);
         [gray(0.32) setFill]; UIRectFill(CGRectMake(0,0,8,1));
     });
-    UIImage *sel=drawImage(CGSizeMake(24,h), ^(CGContextRef ctx){
-        UIBezierPath *p=[UIBezierPath bezierPathWithRoundedRect:CGRectMake(2,2,20,h-4) cornerRadius:4];
-        [[UIColor colorWithWhite:1 alpha:0.13] setFill]; [p fill];
+    // iOS 6 selected tab: a lighter rounded box with a glossy top half, exactly one tab wide.
+    NSUInteger n=MAX((NSUInteger)1,bar.items.count);
+    CGFloat iw=floor((bar.bounds.size.width>0?bar.bounds.size.width:[UIScreen mainScreen].bounds.size.width)/n);
+    UIImage *sel=drawImage(CGSizeMake(iw,h), ^(CGContextRef ctx){
+        CGRect r=CGRectMake(3,2,iw-6,h-4);
+        UIBezierPath *p=[UIBezierPath bezierPathWithRoundedRect:r cornerRadius:4];
         CGContextSaveGState(ctx); [p addClip];
-        [[UIColor colorWithWhite:1 alpha:0.07] setFill]; UIRectFill(CGRectMake(2,2,20,(h-4)/2));
+        CGFloat locs[]={0,0.5,0.5,1};
+        fillGradient(ctx,r,@[[UIColor colorWithWhite:1 alpha:0.22],[UIColor colorWithWhite:1 alpha:0.14],[UIColor colorWithWhite:1 alpha:0.09],[UIColor colorWithWhite:1 alpha:0.07]],locs);
         CGContextRestoreGState(ctx);
+        [[UIColor colorWithWhite:0 alpha:0.5] setStroke]; p.lineWidth=1; [p stroke];
     });
-    sel=[sel resizableImageWithCapInsets:UIEdgeInsetsMake(8,8,8,8) resizingMode:UIImageResizingModeStretch];
     UITabBarAppearance *a=[UITabBarAppearance new];
     [a configureWithOpaqueBackground];
     a.backgroundColor=[UIColor blackColor];
@@ -374,6 +385,8 @@ void MMRetroStyleTabBar(UITabBar *bar, UIColor *accent) {
     if (@available(iOS 15.0, *)) bar.scrollEdgeAppearance=a;
     bar.translucent=NO;
     bar.itemPositioning=UITabBarItemPositioningFill;
+    bar.itemSpacing=0; bar.itemWidth=iw;
+    bar.selectionIndicatorImage=sel;   // also the classic property: some iOS versions ignore it in the appearance
 }
 
 void MMRetroStyleSearchBar(UISearchBar *bar, BOOL dark) {

@@ -1,4 +1,5 @@
 #import "MMSpotify.h"
+#import "MMRemote.h"
 #import "MMAudio.h"
 #import <libkern/OSAtomic.h>
 #import "shannon.h"
@@ -653,6 +654,9 @@ static void aesCTR_mbed(const void*key,const void*in,void*out,size_t n){
 // Track im Voraus laden+entschlüsseln und in den Cache (für nahtlosen Übergang)
 + (void)prefetchTrack:(NSString *)trackId {
     if(!trackId.length) return;
+#ifdef MM_MODERN
+    if([MMRemote enabled]) return;
+#endif
     if(cacheGet(trackId) || diskHas(trackId)) return;   // schon im RAM oder heruntergeladen
     // Lädt gerade ein angetippter Titel: nicht um die Bandbreite konkurrieren, danach vorladen
     @synchronized([MMSpotify class]){ if(gPlayDownloads>0){ gDeferredPrefetch=trackId; slog(@"prefetch %@ zurückgestellt (Titel lädt noch)",trackId); return; } }
@@ -913,6 +917,9 @@ static NSInteger gPlayDownloads=0; static NSString*gStreamingId=nil, *gDeferredP
 #define STREAM_START (512*1024)   // ab so vielen Bytes spielt der Titel schon (der Rest lädt weiter)
 // stream=NO: erst ganz laden (z. B. Fortsetzen an einer gespeicherten Stelle: Spulen braucht die ganze Datei)
 + (void)playTrack:(NSString *)trackId stream:(BOOL)stream completion:(void(^)(BOOL,NSString*))done {
+#ifdef MM_MODERN
+    if([MMRemote enabled]){ [MMRemote playTrack:trackId completion:done]; return; }   // sound comes from the Spotify app
+#endif
     // Läuft genau dieser Titel schon als Stream: nichts stoppen, nichts neu starten (vor dem Hochzählen, damit sein Start gilt)
     // (nur wenn genau dieser Stream gerade zu hören ist; sonst normal neu laden)
     BOOL same; @synchronized([MMSpotify class]){ same=[gStreamingId isEqualToString:trackId] && gStreamingObj && gStreamingObj==[MMAudio currentStream]; }
@@ -1164,6 +1171,7 @@ static NSString* appTokenSync(void){
     if(at.length){ gAppToken=at; gAppExp=[[NSDate date] timeIntervalSince1970]+(ex?ex.doubleValue:3600); }
     return gAppToken;
 }
++ (NSString *)searchKeyId { return readTrim(KEY_ID_PATH); }
 + (BOOL)hasSearchKey { return readTrim(KEY_ID_PATH).length && readTrim(KEY_SEC_PATH).length; }
 + (void)saveSearchKeyId:(NSString *)cid secret:(NSString *)sec completion:(void(^)(BOOL ok, NSString *error))done {
     dispatch_async(dispatch_get_global_queue(0,0), ^{

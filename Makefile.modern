@@ -8,6 +8,8 @@ CC        := $(shell xcrun --sdk iphoneos -f clang)
 MINOS     := 15.0
 ARCH      := -arch arm64 -isysroot $(SDK) -miphoneos-version-min=$(MINOS)
 MBED      := vendor/mbedtls/out/modern
+# Spotify iOS SDK (App Remote): plays songs through the official Spotify app. Fetched by vendor/spotify-sdk-fetch.sh
+SPOT      := vendor/spotify-ios-sdk/SpotifyiOS.xcframework/ios-arm64
 
 APP       := build-modern/Spofity
 BIN       := Spofity
@@ -23,7 +25,7 @@ CFLAGS    := $(ARCH) -fobjc-arc -fmodules -O2 -Wall \
              -Wno-unused-variable -Wno-unused-function -Wno-unguarded-availability-new -Wundeclared-selector \
              \
              -Wno-shorten-64-to-32 -Wno-unused-but-set-variable \
-             -Imusic/App -Imusic/UI -Imusic/Spot -Ivendor/stb -I$(MBED)/include \
+             -Imusic/App -Imusic/UI -Imusic/Spot -Ivendor/stb -I$(MBED)/include -F$(SPOT) \
              -include $(MBED)/include/mbedtls_ios6_predef.h \
              -include music/App/MMCompat.h -DMM_MODERN=1 \
              -MMD -MP
@@ -35,7 +37,8 @@ endif
 FRAMEWORKS:= -framework UIKit -framework CoreGraphics -framework Foundation -framework QuartzCore \
              -framework AVFoundation -framework AudioToolbox -framework Security -framework MediaPlayer \
              -framework SystemConfiguration
-LDFLAGS   := $(ARCH) -fobjc-arc -L$(MBED)/lib -lmbedtls -lmbedx509 -lmbedcrypto -ObjC
+LDFLAGS   := $(ARCH) -fobjc-arc -L$(MBED)/lib -lmbedtls -lmbedx509 -lmbedcrypto -ObjC \
+             -F$(SPOT) -framework SpotifyiOS -Wl,-rpath,@executable_path/Frameworks
 
 ifneq ($(MAKECMDGOALS),clean)
 ifeq ($(wildcard $(MBED)/lib/libmbedtls.a),)
@@ -66,6 +69,10 @@ bundle: $(APP)
 	cp ResourcesModern/*.png $(BUNDLE)/
 	rm -f $(BUNDLE)/Default*.png
 	plutil -convert binary1 $(BUNDLE)/Info.plist
+	mkdir -p $(BUNDLE)/Frameworks
+	cp -R $(SPOT)/SpotifyiOS.framework $(BUNDLE)/Frameworks/
+	rm -rf $(BUNDLE)/Frameworks/SpotifyiOS.framework/Headers $(BUNDLE)/Frameworks/SpotifyiOS.framework/Modules
+	codesign --force --sign - --timestamp=none $(BUNDLE)/Frameworks/SpotifyiOS.framework
 	printf "APPL????" > $(BUNDLE)/PkgInfo
 	chmod 0755 $(BUNDLE)/$(BIN)
 	codesign --force --sign - --timestamp=none $(BUNDLE)

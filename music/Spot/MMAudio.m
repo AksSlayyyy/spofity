@@ -102,6 +102,7 @@ static void fillCb(void *ud, AudioQueueRef q, AudioQueueBufferRef buf){
 - (id)initWithLength:(NSUInteger)length { if((self=[super init])) _data=[NSMutableData dataWithLength:length]; return self; }
 @end
 
+#import "MMRemote.h"
 @implementation MMAudio
 
 + (void)playOgg:(NSData *)ogg { [self start:ogg stream:nil]; }
@@ -150,6 +151,9 @@ static void fillCb(void *ud, AudioQueueRef q, AudioQueueBufferRef buf){
 }
 
 + (void)stop {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) { [MMRemote stop]; return; }
+#endif
     gRunning=NO;
     if(gAQ){ AudioQueueStop(gAQ,true); AudioQueueDispose(gAQ,true); gAQ=NULL; }
     if(gV){ stb_vorbis_close(gV); gV=NULL; }
@@ -157,18 +161,40 @@ static void fillCb(void *ud, AudioQueueRef q, AudioQueueBufferRef buf){
 }
 
 + (void)setPaused:(BOOL)paused {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) { [MMRemote setPaused:paused]; return; }
+#endif
     if(!gAQ) return;
     gPaused=paused;
     if(paused) AudioQueuePause(gAQ); else { cpuReset(); AudioQueueStart(gAQ,NULL); }
 }
 
-+ (BOOL)isPlaying { return gRunning && !gPaused; }
-+ (BOOL)hasEnded { return gAQ!=NULL && !gRunning; }   // Titel bis zum Ende gespielt (Queue gestoppt, aber noch geladen)
-+ (BOOL)isLoaded { return gAQ!=NULL; }                 // NO = nichts geladen (gestoppt) -> "Weiter" hätte nichts zum Fortsetzen
++ (BOOL)isPlaying {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) return [MMRemote isPlaying];
+#endif
+    return gRunning && !gPaused; }
++ (BOOL)hasEnded {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) return [MMRemote hasEnded];
+#endif
+    return gAQ!=NULL && !gRunning; }   // Titel bis zum Ende gespielt (Queue gestoppt, aber noch geladen)
++ (BOOL)isLoaded {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) return YES;
+#endif
+    return gAQ!=NULL; }                 // NO = nichts geladen (gestoppt) -> "Weiter" hätte nichts zum Fortsetzen
 
-+ (double)duration { return gDuration; }
++ (double)duration {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) return [MMRemote duration]>0?[MMRemote duration]:gExpected;
+#endif
+    return gDuration; }
 
 + (double)currentTime {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) return [MMRemote currentTime];
+#endif
     if(!gAQ) return gBaseTime;
     AudioTimeStamp ts; memset(&ts,0,sizeof(ts));
     OSStatus r=AudioQueueGetCurrentTime(gAQ,NULL,&ts,NULL);
@@ -179,6 +205,9 @@ static void fillCb(void *ud, AudioQueueRef q, AudioQueueBufferRef buf){
 }
 
 + (void)seekTo:(double)seconds {
+#ifdef MM_MODERN
+    if([MMRemote enabled]) { [MMRemote seekTo:seconds]; return; }
+#endif
     if(!gV) return;
     MMAudioStream*st=gStream;
     if(st && !st.complete){ gPendingSeek=seconds; return; }   // Spulen braucht das Dateiende -> nach dem Download nachholen

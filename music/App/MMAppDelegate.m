@@ -4,6 +4,7 @@
 #import "MMSpotify.h"
 #import "SpotTheme.h"
 #import "OJTheme.h"
+#import "MMRemote.h"
 
 @interface MMAppDelegate : UIResponder <UIApplicationDelegate>
 @property (nonatomic, strong) UIWindow *window;
@@ -49,6 +50,9 @@
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(authExpired) name:@"MMAuthExpired" object:nil];
     return YES;
 }
+
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary *)options { return [MMRemote handleURL:url]; }
+- (void)applicationDidBecomeActive:(UIApplication *)application { [MMRemote appDidBecomeActive]; }
 
 - (void)authExpired {
     static NSTimeInterval last = 0;
