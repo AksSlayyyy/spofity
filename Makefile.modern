@@ -19,7 +19,7 @@ SRC_C     := $(wildcard music/Spot/*.c)
 OBJ       := $(patsubst %.m,build-modern/obj/%.o,$(SRC_M)) $(patsubst %.c,build-modern/obj/%.o,$(SRC_C))
 
 CFLAGS    := $(ARCH) -fobjc-arc -fmodules -O2 -Wall \
-             -Wdeprecated-declarations -Wno-deprecated-implementations -Wno-format \
+             -Wno-deprecated-declarations -Wno-deprecated-implementations -Wno-format \
              -Wno-unused-variable -Wno-unused-function -Wno-unguarded-availability-new -Wundeclared-selector \
              \
              -Wno-shorten-64-to-32 -Wno-unused-but-set-variable \

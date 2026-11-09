@@ -163,10 +163,14 @@ static void updateStatusStrip(void) {
         gStatusWin.windowLevel=UIWindowLevelNormal+1;
         gStatusWin.userInteractionEnabled=NO;
         gStatusWin.backgroundColor=[UIColor clearColor];
-        gStatusImg=[[UIImageView alloc] initWithFrame:gStatusWin.bounds];
-        gStatusImg.autoresizingMask=UIViewAutoresizingFlexibleWidth;
+        // Every window needs a root view controller at the end of launch, or UIKit aborts the app.
+        UIViewController *vc=[UIViewController new];
+        vc.view.backgroundColor=[UIColor clearColor]; vc.view.userInteractionEnabled=NO;
+        gStatusWin.rootViewController=vc;
+        gStatusImg=[[UIImageView alloc] initWithFrame:vc.view.bounds];
+        gStatusImg.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
         gStatusImg.contentMode=UIViewContentModeScaleToFill;
-        [gStatusWin addSubview:gStatusImg];
+        [vc.view addSubview:gStatusImg];
     }
     if (gStatusDark) gStatusImg.image=drawImage(CGSizeMake(4,MMRetroStatusH), ^(CGContextRef ctx){ [gray(0) setFill]; UIRectFill(CGRectMake(0,0,4,MMRetroStatusH)); });
     else gStatusImg.image=drawImage(CGSizeMake(4,MMRetroStatusH), ^(CGContextRef ctx){
