@@ -9,6 +9,10 @@
 
 #define MMRetroStatusH 20.0
 
+@interface MMRetroSlide : NSObject <UIViewControllerAnimatedTransitioning, UIViewControllerTransitioningDelegate>
+@property (nonatomic) BOOL presenting;
+@end
+
 #pragma mark - Drawing helpers
 
 static void rgbOf(UIColor *c, CGFloat *r, CGFloat *g, CGFloat *b) {
@@ -379,9 +383,6 @@ void MMStatusBarHidden(BOOL hidden) {
 UIViewController *MMRetroBelowStatusBar(UIViewController *vc) {
     MMRetroStatusContainer *c=[MMRetroStatusContainer new]; c.inner=vc; return c;
 }
-@interface MMRetroSlide : NSObject <UIViewControllerAnimatedTransitioning, UIViewControllerTransitioningDelegate>
-@property (nonatomic) BOOL presenting;
-@end
 @implementation MMRetroSlide
 - (NSTimeInterval)transitionDuration:(id<UIViewControllerContextTransitioning>)c { return 0.4; }
 - (void)animateTransition:(id<UIViewControllerContextTransitioning>)c {
